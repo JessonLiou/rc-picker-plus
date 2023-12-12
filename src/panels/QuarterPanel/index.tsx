@@ -1,12 +1,10 @@
 import * as React from 'react';
 import QuarterHeader from './QuarterHeader';
 import QuarterBody from './QuarterBody';
-import type { CellRender, PanelSharedProps } from '../../interface';
+import type { PanelSharedProps } from '../../interface';
 import { createKeyDownHandler } from '../../utils/uiUtil';
 
-export type QuarterPanelProps<DateType> = {
-  cellRender?: CellRender<DateType>;
-} & PanelSharedProps<DateType>;
+export type QuarterPanelProps<DateType> = {} & PanelSharedProps<DateType>;
 
 function QuarterPanel<DateType>(props: QuarterPanelProps<DateType>) {
   const {

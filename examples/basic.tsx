@@ -1,11 +1,11 @@
 import React from 'react';
 import type { Moment } from 'moment';
 import moment from 'moment';
-import Picker from '../../src/Picker';
-import momentGenerateConfig from '../../src/generate/moment';
-import zhCN from '../../src/locale/zh_CN';
-import enUS from '../../src/locale/en_US';
-import '../../assets/index.less';
+import Picker from '../src/Picker';
+import momentGenerateConfig from '../src/generate/moment';
+import zhCN from '../src/locale/zh_CN';
+import enUS from '../src/locale/en_US';
+import '../assets/index.less';
 
 // const defaultValue = moment('2019-09-03 05:02:03');
 const defaultValue = moment('2019-11-28 01:02:03');
@@ -28,16 +28,6 @@ export default () => {
     value,
     onSelect,
     onChange,
-    presets: [
-      {
-        label: 'Hello World!',
-        value: moment(),
-      },
-      {
-        label: 'Now',
-        value: () => moment(),
-      }
-    ],
   };
 
   const keyDown = (e, preventDefault) => {
@@ -51,7 +41,7 @@ export default () => {
       <div style={{ display: 'flex', flexWrap: 'wrap' }}>
         <div style={{ margin: '0 8px' }}>
           <h3>Basic</h3>
-          <Picker<Moment> {...sharedProps} locale={zhCN} suffixIcon="SUFFIX" />
+          <Picker<Moment> {...sharedProps} locale={zhCN} />
           <Picker<Moment> {...sharedProps} locale={enUS} />
         </div>
         <div style={{ margin: '0 8px' }}>
@@ -75,7 +65,7 @@ export default () => {
               defaultValue: moment('11:28:39', 'HH:mm:ss'),
             }}
             showToday
-            disabledTime={(date) => {
+            disabledTime={date => {
               if (date && date.isSame(defaultValue, 'date')) {
                 return {
                   disabledHours: () => [1, 3, 5, 7, 9, 11],
@@ -83,7 +73,6 @@ export default () => {
               }
               return {};
             }}
-            changeOnBlur
           />
         </div>
         <div style={{ margin: '0 8px' }}>

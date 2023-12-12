@@ -3,7 +3,6 @@ import { useRef, useLayoutEffect } from 'react';
 import classNames from 'classnames';
 import { scrollTo, waitElementReady } from '../../utils/uiUtil';
 import PanelContext from '../../PanelContext';
-import type { CellRender, Locale } from '../../interface';
 
 export type Unit = {
   label: React.ReactText;
@@ -11,23 +10,17 @@ export type Unit = {
   disabled: boolean;
 };
 
-export type TimeUnitColumnProps<DateType> = {
+export type TimeUnitColumnProps = {
   prefixCls?: string;
   units?: Unit[];
   value?: number;
   active?: boolean;
   hideDisabledOptions?: boolean;
   onSelect?: (value: number) => void;
-  type: 'hour' | 'minute' | 'second' | 'meridiem';
-  info: {
-    today: DateType,
-    locale: Locale,
-    cellRender: CellRender<DateType, number>,
-  }
 };
 
-function TimeUnitColumn<DateType>(props: TimeUnitColumnProps<DateType>) {
-  const { prefixCls, units, onSelect, value, active, hideDisabledOptions, info, type } = props;
+function TimeUnitColumn(props: TimeUnitColumnProps) {
+  const { prefixCls, units, onSelect, value, active, hideDisabledOptions } = props;
   const cellPrefixCls = `${prefixCls}-cell`;
   const { open } = React.useContext(PanelContext);
 
@@ -88,14 +81,7 @@ function TimeUnitColumn<DateType>(props: TimeUnitColumnProps<DateType>) {
               onSelect!(unit.value);
             }}
           >
-            {info.cellRender ? info.cellRender(unit.value, {
-              today: info.today,
-              locale: info.locale,
-              originNode: <div className={`${cellPrefixCls}-inner`}>{unit.label}</div>,
-              type: 'time',
-              subType: type
-            }) : <div className={`${cellPrefixCls}-inner`}>{unit.label}</div>}
-            
+            <div className={`${cellPrefixCls}-inner`}>{unit.label}</div>
           </li>
         );
       })}

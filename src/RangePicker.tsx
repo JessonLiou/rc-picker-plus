@@ -1,61 +1,48 @@
-import classNames from 'classnames';
-import useMergedState from 'rc-util/lib/hooks/useMergedState';
-import pickAttrs from 'rc-util/lib/pickAttrs';
-import raf from 'rc-util/lib/raf';
-import warning from 'rc-util/lib/warning';
 import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
-import type { PickerPanelProps } from '.';
-import type { GenerateConfig } from './generate';
-import { useCellRender } from './hooks/useCellRender';
-import useHoverValue from './hooks/useHoverValue';
+import { useRef, useEffect, useState } from 'react';
+import classNames from 'classnames';
+import warning from 'rc-util/lib/warning';
+import useMergedState from 'rc-util/lib/hooks/useMergedState';
+import type { DisabledTimes, PanelMode, PickerMode, RangeValue, EventValue } from './interface';
+import type { PickerBaseProps, PickerDateProps, PickerTimeProps, PickerRefConfig } from './Picker';
+import type { SharedTimeProps } from './panels/TimePanel';
+import PickerTrigger from './PickerTrigger';
+import PickerPanel from './PickerPanel';
 import usePickerInput from './hooks/usePickerInput';
-import usePresets from './hooks/usePresets';
-import useRangeDisabled from './hooks/useRangeDisabled';
-import useRangeOpen from './hooks/useRangeOpen';
-import useRangeViewDates from './hooks/useRangeViewDates';
-import useTextValueMapping from './hooks/useTextValueMapping';
-import useValueTexts from './hooks/useValueTexts';
-import type {
-  CellRender,
-  CellRenderInfo,
-  DisabledTimes,
-  EventValue,
-  PanelMode,
-  PickerMode,
-  PresetDate,
-  RangeValue,
-} from './interface';
+import getDataOrAriaProps, { toArray, getValue, updateValues } from './utils/miscUtil';
+import { getDefaultFormat, getInputSize, elementsContains } from './utils/uiUtil';
 import type { ContextOperationRefProps } from './PanelContext';
 import PanelContext from './PanelContext';
-import type { SharedTimeProps } from './panels/TimePanel';
-import type { PickerBaseProps, PickerDateProps, PickerRefConfig, PickerTimeProps } from './Picker';
-import PickerPanel from './PickerPanel';
-import PickerTrigger from './PickerTrigger';
-import PresetPanel from './PresetPanel';
-import RangeContext from './RangeContext';
 import {
-  formatValue,
-  getClosingViewDate,
   isEqual,
+  getClosingViewDate,
   isSameDate,
-  isSameQuarter,
   isSameWeek,
+  isSameQuarter,
+  formatValue,
   parseValue,
 } from './utils/dateUtil';
-import { getClearIcon } from './utils/getClearIcon';
+import useValueTexts from './hooks/useValueTexts';
+import useTextValueMapping from './hooks/useTextValueMapping';
+import type { GenerateConfig } from './generate';
+import type { PickerPanelProps } from '.';
+import RangeContext from './RangeContext';
+import useRangeDisabled from './hooks/useRangeDisabled';
 import getExtraFooter from './utils/getExtraFooter';
 import getRanges from './utils/getRanges';
-import { getValue, toArray, updateValues } from './utils/miscUtil';
-import { elementsContains, getDefaultFormat, getInputSize } from './utils/uiUtil';
-import { legacyPropsWarning } from './utils/warnUtil';
+import useRangeViewDates from './hooks/useRangeViewDates';
+import type { DateRender } from './panels/DatePanel/DateBody';
+import useHoverValue from './hooks/useHoverValue';
 
 function reorderValues<DateType>(
   values: RangeValue<DateType>,
   generateConfig: GenerateConfig<DateType>,
+  forceKeepValue?: boolean,
 ): RangeValue<DateType> {
-  if (values && values[0] && values[1] && generateConfig.isAfter(values[0], values[1])) {
-    return [values[1], values[0]];
+  if (!forceKeepValue) {
+    if (values && values[0] && values[1] && generateConfig.isAfter(values[0], values[1])) {
+      return [values[1], values[0]];
+    }
   }
 
   return values;
@@ -98,16 +85,10 @@ export type RangePickerSharedProps<DateType> = {
   id?: string;
   value?: RangeValue<DateType>;
   defaultValue?: RangeValue<DateType>;
-  /**
-   * @deprecated please use `defaultValue` instead.
-   * Set default display picker view date
-   */
   defaultPickerValue?: [DateType, DateType];
   placeholder?: [string, string];
   disabled?: boolean | [boolean, boolean];
   disabledTime?: (date: EventValue<DateType>, type: RangeType) => DisabledTimes;
-  presets?: PresetDate<Exclude<RangeValue<DateType>, null>>[];
-  /** @deprecated Please use `presets` instead */
   ranges?: Record<
     string,
     Exclude<RangeValue<DateType>, null> | (() => Exclude<RangeValue<DateType>, null>)
@@ -124,25 +105,16 @@ export type RangePickerSharedProps<DateType> = {
   onPanelChange?: (values: RangeValue<DateType>, modes: [PanelMode, PanelMode]) => void;
   onFocus?: React.FocusEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
-  onMouseDown?: React.MouseEventHandler<HTMLDivElement>;
-  onMouseUp?: React.MouseEventHandler<HTMLDivElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLDivElement>;
   onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
-  onClick?: React.MouseEventHandler<HTMLDivElement>;
   onOk?: (dates: RangeValue<DateType>) => void;
   direction?: 'ltr' | 'rtl';
   autoComplete?: string;
   /** @private Internal control of active picker. Do not use since it's private usage */
   activePickerIndex?: 0 | 1;
-  /** @deprecated use cellRender instead of dateRender */
   dateRender?: RangeDateRender<DateType>;
-  cellRender?: CellRender<DateType>;
   panelRender?: (originPanel: React.ReactNode) => React.ReactNode;
-  /**
-   * Trigger `onChange` event when blur.
-   * If you don't want to user click `confirm` to trigger change, can use this.
-   */
-  changeOnBlur?: boolean;
+  forceKeepValue?: boolean;
 };
 
 type OmitPickerProps<Props> = Omit<
@@ -162,8 +134,8 @@ type OmitPickerProps<Props> = Omit<
   | 'pickerValue'
   | 'onPickerValueChange'
   | 'onOk'
-  | 'cellRender'
-  | 'presets'
+  | 'dateRender'
+  | 'forceKeepValue'
 >;
 
 type RangeShowTimeObject<DateType> = Omit<SharedTimeProps<DateType>, 'defaultValue'> & {
@@ -189,7 +161,7 @@ export type RangePickerProps<DateType> =
   | RangePickerTimeProps<DateType>;
 
 // TMP type to fit for ts 3.9.2
-type OmitType<DateType> = Omit<RangePickerBaseProps<DateType>, 'picker' | 'presets'> &
+type OmitType<DateType> = Omit<RangePickerBaseProps<DateType>, 'picker'> &
   Omit<RangePickerDateProps<DateType>, 'picker'> &
   Omit<RangePickerTimeProps<DateType>, 'picker'>;
 
@@ -226,10 +198,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     disabledDate,
     disabledTime,
     dateRender,
-    monthCellRender,
-    cellRender,
     panelRender,
-    presets,
     ranges,
     allowEmpty,
     allowClear,
@@ -245,11 +214,8 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     onCalendarChange,
     onFocus,
     onBlur,
-    onMouseDown,
-    onMouseUp,
     onMouseEnter,
     onMouseLeave,
-    onClick,
     onOk,
     onKeyDown,
     components,
@@ -257,10 +223,13 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     direction,
     activePickerIndex,
     autoComplete = 'off',
-    changeOnBlur,
+    forceKeepValue,
   } = props as MergedRangePickerProps<DateType>;
 
   const needConfirmButton: boolean = (picker === 'date' && !!showTime) || picker === 'time';
+
+  // We record opened status here in case repeat open with picker
+  const openRecordsRef = useRef<Record<number, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const panelDivRef = useRef<HTMLDivElement>(null);
@@ -269,20 +238,14 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
   const separatorRef = useRef<HTMLDivElement>(null);
   const startInputRef = useRef<HTMLInputElement>(null);
   const endInputRef = useRef<HTMLInputElement>(null);
-  const arrowRef = useRef<HTMLDivElement>(null);
-
-  // ============================ Warning ============================
-  if (process.env.NODE_ENV !== 'production') {
-    legacyPropsWarning(props);
-  }
 
   // ============================= Misc ==============================
   const formatList = toArray(getDefaultFormat<DateType>(format, picker, showTime, use12Hours));
 
-  const formatDateValue = (values: RangeValue<DateType>, index: 0 | 1) =>
-    values && values[index]
-      ? formatValue(values[index], { generateConfig, locale, format: formatList[0] })
-      : '';
+  // Active picker
+  const [mergedActivePickerIndex, setMergedActivePickerIndex] = useMergedState<0 | 1>(0, {
+    value: activePickerIndex,
+  });
 
   // Operation ref
   const operationRef: React.MutableRefObject<ContextOperationRefProps | null> =
@@ -301,7 +264,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     value,
     defaultValue,
     postState: (values) =>
-      picker === 'time' && !order ? values : reorderValues(values, generateConfig),
+      picker === 'time' && !order ? values : reorderValues(values, generateConfig, forceKeepValue),
   });
 
   // =========================== View Date ===========================
@@ -324,12 +287,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
 
       // Fill disabled unit
       for (let i = 0; i < 2; i += 1) {
-        if (
-          mergedDisabled[i] &&
-          !postValues &&
-          !getValue(postValues, i) &&
-          !getValue(allowEmpty, i)
-        ) {
+        if (mergedDisabled[i] && !getValue(postValues, i) && !getValue(allowEmpty, i)) {
           postValues = updateValues(postValues, generateConfig.getNow(), i);
         }
       }
@@ -354,24 +312,6 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     }
   };
 
-  // ============================= Open ==============================
-  const [mergedOpen, mergedActivePickerIndex, firstTimeOpen, triggerOpen] = useRangeOpen(
-    defaultOpen,
-    open,
-    activePickerIndex,
-    changeOnBlur,
-    needConfirmButton,
-    startInputRef,
-    endInputRef,
-    getValue(selectedValue, 0),
-    getValue(selectedValue, 1),
-    mergedDisabled,
-    onOpenChange,
-  );
-
-  const startOpen = mergedOpen && mergedActivePickerIndex === 0;
-  const endOpen = mergedOpen && mergedActivePickerIndex === 1;
-
   // ========================= Disable Date ==========================
   const [disabledStartDate, disabledEndDate] = useRangeDisabled(
     {
@@ -382,8 +322,28 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
       disabledDate,
       generateConfig,
     },
-    !mergedOpen || firstTimeOpen,
+    openRecordsRef.current[1],
+    openRecordsRef.current[0],
   );
+
+  // ============================= Open ==============================
+  const [mergedOpen, triggerInnerOpen] = useMergedState(false, {
+    value: open,
+    defaultValue: defaultOpen,
+    postState: (postOpen) => (mergedDisabled[mergedActivePickerIndex] ? false : postOpen),
+    onChange: (newOpen) => {
+      if (onOpenChange) {
+        onOpenChange(newOpen);
+      }
+
+      if (!newOpen && operationRef.current && operationRef.current.onClose) {
+        operationRef.current.onClose();
+      }
+    },
+  });
+
+  const startOpen = mergedOpen && mergedActivePickerIndex === 0;
+  const endOpen = mergedOpen && mergedActivePickerIndex === 1;
 
   // ============================= Popup =============================
   // Popup min width
@@ -395,20 +355,46 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
   }, [mergedOpen]);
 
   // ============================ Trigger ============================
+  const triggerRef = React.useRef<any>();
+
+  function triggerOpen(newOpen: boolean, index: 0 | 1) {
+    if (newOpen) {
+      clearTimeout(triggerRef.current);
+      openRecordsRef.current[index] = true;
+
+      setMergedActivePickerIndex(index);
+      triggerInnerOpen(newOpen);
+
+      // Open to reset view date
+      if (!mergedOpen) {
+        setViewDate(null, index);
+      }
+    } else if (mergedActivePickerIndex === index) {
+      triggerInnerOpen(newOpen);
+
+      // Clean up async
+      // This makes ref not quick refresh in case user open another input with blur trigger
+      const openRecords = openRecordsRef.current;
+      triggerRef.current = setTimeout(() => {
+        if (openRecords === openRecordsRef.current) {
+          openRecordsRef.current = {};
+        }
+      });
+    }
+  }
+
   function triggerOpenAndFocus(index: 0 | 1) {
-    triggerOpen(true, index, 'open');
+    triggerOpen(true, index);
     // Use setTimeout to make sure panel DOM exists
-    raf(() => {
+    setTimeout(() => {
       const inputRef = [startInputRef, endInputRef][index];
-      inputRef.current?.focus();
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }, 0);
   }
 
-  function triggerChange(
-    newValue: RangeValue<DateType>,
-    sourceIndex: 0 | 1,
-    triggerCalendarChangeOnly?: boolean,
-  ) {
+  function triggerChange(newValue: RangeValue<DateType>, sourceIndex: 0 | 1) {
     let values = newValue;
     let startValue = getValue(values, 0);
     let endValue = getValue(values, 1);
@@ -434,16 +420,27 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
           startValue = null;
           values = [null, endValue];
         }
+
+        // Clean up cache since invalidate
+        openRecordsRef.current = {
+          [sourceIndex]: true,
+        };
       } else if (picker !== 'time' || order !== false) {
         // Reorder when in same date
-        values = reorderValues(values, generateConfig);
+        values = reorderValues(values, generateConfig, forceKeepValue);
       }
     }
 
     setSelectedValue(values);
 
-    const startStr = formatDateValue(values, 0);
-    const endStr = formatDateValue(values, 1);
+    const startStr =
+      values && values[0]
+        ? formatValue(values[0], { generateConfig, locale, format: formatList[0] })
+        : '';
+    const endStr =
+      values && values[1]
+        ? formatValue(values[1], { generateConfig, locale, format: formatList[0] })
+        : '';
 
     if (onCalendarChange) {
       const info: RangeInfo = { range: sourceIndex === 0 ? 'start' : 'end' };
@@ -451,22 +448,45 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
       onCalendarChange(values, [startStr, endStr], info);
     }
 
-    if (!triggerCalendarChangeOnly) {
-      // >>>>> Trigger `onChange` event
-      const canStartValueTrigger = canValueTrigger(startValue, 0, mergedDisabled, allowEmpty);
-      const canEndValueTrigger = canValueTrigger(endValue, 1, mergedDisabled, allowEmpty);
-      const canTrigger = values === null || (canStartValueTrigger && canEndValueTrigger);
-      if (canTrigger) {
-        // Trigger onChange only when value is validate
-        setInnerValue(values);
-        if (
-          onChange &&
-          (!isEqual(generateConfig, getValue(mergedValue, 0), startValue) ||
-            !isEqual(generateConfig, getValue(mergedValue, 1), endValue))
-        ) {
-          onChange(values, [startStr, endStr]);
-        }
+    // >>>>> Trigger `onChange` event
+    const canStartValueTrigger = canValueTrigger(startValue, 0, mergedDisabled, allowEmpty);
+    const canEndValueTrigger = canValueTrigger(endValue, 1, mergedDisabled, allowEmpty);
+
+    const canTrigger = values === null || (canStartValueTrigger && canEndValueTrigger);
+
+    if (canTrigger) {
+      // Trigger onChange only when value is validate
+      setInnerValue(values);
+
+      if (
+        onChange &&
+        (!isEqual(generateConfig, getValue(mergedValue, 0), startValue) ||
+          !isEqual(generateConfig, getValue(mergedValue, 1), endValue))
+      ) {
+        onChange(values, [startStr, endStr]);
       }
+    }
+
+    // >>>>> Open picker when
+
+    // Always open another picker if possible
+    let nextOpenIndex: 0 | 1 = null;
+    if (sourceIndex === 0 && !mergedDisabled[1]) {
+      nextOpenIndex = 1;
+    } else if (sourceIndex === 1 && !mergedDisabled[0]) {
+      nextOpenIndex = 0;
+    }
+
+    if (
+      nextOpenIndex !== null &&
+      nextOpenIndex !== mergedActivePickerIndex &&
+      (!openRecordsRef.current[nextOpenIndex] || !getValue(values, nextOpenIndex)) &&
+      getValue(values, sourceIndex)
+    ) {
+      // Delay to focus to avoid input blur trigger expired selectedValues
+      triggerOpenAndFocus(nextOpenIndex);
+    } else {
+      triggerOpen(false, sourceIndex);
     }
   }
 
@@ -565,120 +585,62 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
   };
 
   // ============================= Input =============================
-  // We call effect to update `delayOpen` here since
-  // when popup closed and input focused, should not trigger change when click another input
-  const [delayOpen, setDelayOpen] = React.useState(mergedOpen);
-  React.useEffect(() => {
-    setDelayOpen(mergedOpen);
-  }, [mergedOpen]);
-
-  const onInternalBlur: React.FocusEventHandler<HTMLInputElement> = (e) => {
-    if (delayOpen) {
-      if (needConfirmButton) {
-        // when in dateTime mode, switching between two date input fields will trigger onCalendarChange.
-        // when onBlur is triggered, the input field has already switched,
-        // so it's necessary to obtain the value of the previous input field here.
-        const needTriggerIndex = mergedActivePickerIndex ? 0 : 1;
-        const selectedIndexValue = getValue(selectedValue, needTriggerIndex);
-
-        if (selectedIndexValue) {
-          triggerChange(selectedValue, needTriggerIndex, true);
-        }
-      } else if (changeOnBlur) {
-        const selectedIndexValue = getValue(selectedValue, mergedActivePickerIndex);
-
-        if (selectedIndexValue) {
-          triggerChange(selectedValue, mergedActivePickerIndex);
-        }
-      }
-    }
-
-    return onBlur?.(e);
-  };
-
   const getSharedInputHookProps = (index: 0 | 1, resetText: () => void) => ({
-    blurToCancel: !changeOnBlur && needConfirmButton,
-    changeOnBlur,
+    blurToCancel: needConfirmButton,
     forwardKeyDown,
-    onBlur: onInternalBlur,
-    isClickOutside: (target: EventTarget | null) => {
-      const elementsRefs = [startInputDivRef.current, endInputDivRef.current, containerRef.current];
-      return !elementsContains(
+    onBlur,
+    isClickOutside: (target: EventTarget | null) =>
+      !elementsContains(
         [
-          // Filter the ref of the currently selected input to trigger the onBlur event of another input.
-          ...(needConfirmButton ? [elementsRefs[mergedActivePickerIndex]] : elementsRefs),
           panelDivRef.current,
+          startInputDivRef.current,
+          endInputDivRef.current,
+          containerRef.current,
         ],
         target as HTMLElement,
-      );
-    },
+      ),
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
+      setMergedActivePickerIndex(index);
       if (onFocus) {
         onFocus(e);
       }
     },
     triggerOpen: (newOpen: boolean) => {
-      if (newOpen) {
-        triggerOpen(newOpen, index, 'open');
-      } else {
-        triggerOpen(
-          newOpen,
-          // Close directly if no selected value provided
-          getValue(selectedValue, index) ? index : false,
-          'blur',
-        );
-      }
+      triggerOpen(newOpen, index);
     },
     onSubmit: () => {
-      if (
-        // When user typing disabledDate with keyboard and enter, this value will be empty
-        !selectedValue ||
-        // Normal disabled check
-        (disabledDate && disabledDate(selectedValue[index]))
-      ) {
-        return false;
-      }
-
       triggerChange(selectedValue, index);
       resetText();
-
-      // Switch
-      triggerOpen(false, mergedActivePickerIndex, 'confirm');
     },
     onCancel: () => {
-      triggerOpen(false, index, 'cancel');
+      triggerOpen(false, index);
       setSelectedValue(mergedValue);
       resetText();
     },
   });
 
-  const sharedPickerInput = {
-    onKeyDown: (e, preventDefault) => {
-      onKeyDown?.(e, preventDefault);
-    },
-  };
-
   const [startInputProps, { focused: startFocused, typing: startTyping }] = usePickerInput({
     ...getSharedInputHookProps(0, resetStartText),
     open: startOpen,
     value: startText,
-    ...sharedPickerInput,
+    onKeyDown: (e, preventDefault) => {
+      onKeyDown?.(e, preventDefault);
+    },
   });
 
   const [endInputProps, { focused: endFocused, typing: endTyping }] = usePickerInput({
     ...getSharedInputHookProps(1, resetEndText),
     open: endOpen,
     value: endText,
-    ...sharedPickerInput,
+    onKeyDown: (e, preventDefault) => {
+      onKeyDown?.(e, preventDefault);
+    },
   });
 
   // ========================== Click Picker ==========================
-  const onPickerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const onPickerClick = (e: MouseEvent) => {
     // When click inside the picker & outside the picker's input elements
     // the panel should still be opened
-    if (onClick) {
-      onClick(e);
-    }
     if (
       !mergedOpen &&
       !startInputRef.current.contains(e.target as Node) &&
@@ -692,11 +654,8 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     }
   };
 
-  const onPickerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const onPickerMouseDown = (e: MouseEvent) => {
     // shouldn't affect input elements if picker is active
-    if (onMouseDown) {
-      onMouseDown(e);
-    }
     if (
       mergedOpen &&
       (startFocused || endFocused) &&
@@ -748,18 +707,6 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     setSelectedValue(mergedValue);
   }, [startStr, endStr]);
 
-  const mergedCellRender: CellRender<DateType> = useCellRender({
-    cellRender,
-    monthCellRender,
-    dateRender,
-  });
-
-  const panelDateRender = React.useMemo(() => {
-    if (!mergedCellRender) return undefined;
-    return (date: DateType, info: CellRenderInfo<DateType>) =>
-      mergedCellRender(date, { ...info, range: mergedActivePickerIndex ? 'end' : 'start' });
-  }, [mergedActivePickerIndex, mergedCellRender]);
-
   // ============================ Warning ============================
   if (process.env.NODE_ENV !== 'production') {
     if (
@@ -773,9 +720,6 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
         '`disabled` should not set with empty `value`. You should set `allowEmpty` or `value` instead.',
       );
     }
-    warning(!dateRender, `'dateRender' is deprecated. Please use 'cellRender' instead.`);
-    warning(!monthCellRender, `'monthCellRender' is deprecated. Please use 'cellRender' instead.`);
-    warning(!clearIcon, '`clearIcon` will be removed in future. Please use `allowClear` instead.');
   }
 
   // ============================ Private ============================
@@ -798,7 +742,26 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
   }
 
   // ============================ Ranges =============================
-  const presetList = usePresets(presets, ranges);
+  const rangeLabels = Object.keys(ranges || {});
+
+  const rangeList = rangeLabels.map((label) => {
+    const range = ranges![label];
+    const newValues = typeof range === 'function' ? range() : range;
+
+    return {
+      label,
+      onClick: () => {
+        triggerChange(newValues, null);
+        triggerOpen(false, mergedActivePickerIndex);
+      },
+      onMouseEnter: () => {
+        setRangeHoverValue(newValues);
+      },
+      onMouseLeave: () => {
+        setRangeHoverValue(null);
+      },
+    };
+  });
 
   // ============================= Panel =============================
   function renderPanel(
@@ -826,6 +789,14 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
       };
     }
 
+    let panelDateRender: DateRender<DateType> | null = null;
+    if (dateRender) {
+      panelDateRender = (date, today) =>
+        dateRender(date, today, {
+          range: mergedActivePickerIndex ? 'end' : 'start',
+        });
+    }
+
     return (
       <RangeContext.Provider
         value={{
@@ -838,7 +809,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
         <PickerPanel<DateType>
           {...(props as any)}
           {...panelProps}
-          cellRender={panelDateRender}
+          dateRender={panelDateRender}
           showTime={panelShowTime}
           mode={mergedModes[mergedActivePickerIndex]}
           generateConfig={generateConfig}
@@ -895,27 +866,12 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     mergedActivePickerIndex &&
     startInputDivRef.current &&
     separatorRef.current &&
-    panelDivRef.current &&
-    arrowRef.current
+    panelDivRef.current
   ) {
     // Arrow offset
     arrowLeft = startInputDivRef.current.offsetWidth + separatorRef.current.offsetWidth;
 
-    // If panelWidth - arrowWidth - arrowMarginLeft < arrowLeft, panel should move to right side.
-    // If arrowOffsetLeft > arrowLeft, arrowMarginLeft = arrowOffsetLeft - arrowLeft
-    const arrowMarginLeft =
-      arrowRef.current.offsetLeft > arrowLeft
-        ? arrowRef.current.offsetLeft - arrowLeft
-        : arrowRef.current.offsetLeft;
-
-    const panelWidth = panelDivRef.current.offsetWidth;
-    const arrowWidth = arrowRef.current.offsetWidth;
-
-    if (
-      panelWidth &&
-      arrowWidth &&
-      arrowLeft > panelWidth - arrowWidth - (direction === 'rtl' ? 0 : arrowMarginLeft)
-    ) {
+    if (panelDivRef.current.offsetWidth && arrowLeft > panelDivRef.current.offsetWidth) {
       panelLeft = arrowLeft;
     }
   }
@@ -938,15 +894,14 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
         !getValue(selectedValue, mergedActivePickerIndex) ||
         (disabledDate && disabledDate(selectedValue[mergedActivePickerIndex])),
       locale,
-      // rangeList,
+      rangeList,
       onOk: () => {
-        const selectedIndexValue = getValue(selectedValue, mergedActivePickerIndex);
-        if (selectedIndexValue) {
+        if (getValue(selectedValue, mergedActivePickerIndex)) {
+          // triggerChangeOld(selectedValue);
           triggerChange(selectedValue, mergedActivePickerIndex);
-          onOk?.(selectedValue);
-
-          // Switch
-          triggerOpen(false, mergedActivePickerIndex, 'confirm');
+          if (onOk) {
+            onOk(selectedValue);
+          }
         }
       },
     });
@@ -993,28 +948,15 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
     }
 
     let mergedNodes: React.ReactNode = (
-      <div className={`${prefixCls}-panel-layout`}>
-        <PresetPanel
-          prefixCls={prefixCls}
-          presets={presetList}
-          onClick={(nextValue) => {
-            triggerChange(nextValue, null);
-            triggerOpen(false, mergedActivePickerIndex, 'preset');
-          }}
-          onHover={(hoverValue) => {
-            setRangeHoverValue(hoverValue);
-          }}
-        />
-        <div>
-          <div className={`${prefixCls}-panels`}>{panels}</div>
-          {(extraNode || rangesNode) && (
-            <div className={`${prefixCls}-footer`}>
-              {extraNode}
-              {rangesNode}
-            </div>
-          )}
-        </div>
-      </div>
+      <>
+        <div className={`${prefixCls}-panels`}>{panels}</div>
+        {(extraNode || rangesNode) && (
+          <div className={`${prefixCls}-footer`}>
+            {extraNode}
+            {rangesNode}
+          </div>
+        )}
+      </>
     );
 
     if (panelRender) {
@@ -1040,7 +982,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
       className={classNames(`${prefixCls}-range-wrapper`, `${prefixCls}-${picker}-range-wrapper`)}
       style={{ minWidth: popupMinWidth }}
     >
-      <div ref={arrowRef} className={`${prefixCls}-range-arrow`} style={arrowPositionStyle} />
+      <div className={`${prefixCls}-range-arrow`} style={arrowPositionStyle} />
 
       {renderPanels()}
     </div>
@@ -1049,53 +991,42 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
   // ============================= Icons =============================
   let suffixNode: React.ReactNode;
   if (suffixIcon) {
-    suffixNode = (
+    suffixNode = <span className={`${prefixCls}-suffix`}>{suffixIcon}</span>;
+  }
+
+  let clearNode: React.ReactNode;
+  if (
+    allowClear &&
+    ((getValue(mergedValue, 0) && !mergedDisabled[0]) ||
+      (getValue(mergedValue, 1) && !mergedDisabled[1]))
+  ) {
+    clearNode = (
       <span
-        className={`${prefixCls}-suffix`}
         onMouseDown={(e) => {
-          // Not lost focus
           e.preventDefault();
+          e.stopPropagation();
         }}
+        onMouseUp={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          let values = mergedValue;
+
+          if (!mergedDisabled[0]) {
+            values = updateValues(values, null, 0);
+          }
+          if (!mergedDisabled[1]) {
+            values = updateValues(values, null, 1);
+          }
+
+          triggerChange(values, null);
+          triggerOpen(false, mergedActivePickerIndex);
+        }}
+        className={`${prefixCls}-clear`}
       >
-        {suffixIcon}
+        {clearIcon || <span className={`${prefixCls}-clear-btn`} />}
       </span>
     );
   }
-
-  const mergedClearIcon: React.ReactNode = getClearIcon(prefixCls, allowClear, clearIcon);
-
-  const clearNode: React.ReactNode = (
-    <span
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      onMouseUp={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        let values = mergedValue;
-
-        if (!mergedDisabled[0]) {
-          values = updateValues(values, null, 0);
-        }
-        if (!mergedDisabled[1]) {
-          values = updateValues(values, null, 1);
-        }
-
-        triggerChange(values, null);
-        triggerOpen(false, mergedActivePickerIndex, 'clear');
-      }}
-      className={`${prefixCls}-clear`}
-      role="button"
-    >
-      {mergedClearIcon}
-    </span>
-  );
-
-  const mergedAllowClear =
-    allowClear &&
-    ((getValue(mergedValue as RangeValue<DateType>, 0) && !mergedDisabled[0]) ||
-      (getValue(mergedValue as RangeValue<DateType>, 1) && !mergedDisabled[1]));
 
   const inputSharedProps = {
     size: getInputSize(picker, formatList[0], generateConfig),
@@ -1125,14 +1056,6 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
         onStartLeave();
       } else {
         onEndLeave();
-      }
-
-      // Switch
-      const nextActivePickerIndex = mergedActivePickerIndex === 0 ? 1 : 0;
-      if (mergedDisabled[nextActivePickerIndex]) {
-        triggerOpen(false, false, 'confirm');
-      } else {
-        triggerOpen(false, mergedActivePickerIndex, 'confirm');
       }
     } else {
       setSelectedValue(values);
@@ -1175,8 +1098,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           onMouseDown={onPickerMouseDown}
-          onMouseUp={onMouseUp}
-          {...pickAttrs(props, { aria: true, data: true })}
+          {...getDataOrAriaProps(props)}
         >
           <div
             className={classNames(`${prefixCls}-input`, {
@@ -1234,7 +1156,7 @@ function InnerRangePicker<DateType>(props: RangePickerProps<DateType>) {
             }}
           />
           {suffixNode}
-          {mergedAllowClear && clearNode}
+          {clearNode}
         </div>
       </PickerTrigger>
     </PanelContext.Provider>

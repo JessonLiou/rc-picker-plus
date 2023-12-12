@@ -1,133 +1,99 @@
-/* eslint-disable @typescript-eslint/no-loop-func */
-import { act, createEvent, fireEvent, render } from '@testing-library/react';
-import type { Moment } from 'moment';
-import moment from 'moment';
-import 'moment/locale/zh-cn';
-import KeyCode from 'rc-util/lib/KeyCode';
-import { spyElementPrototypes } from 'rc-util/lib/test/domHook';
-import { resetWarned } from 'rc-util/lib/warning';
 import React from 'react';
+import MockDate from 'mockdate';
+import { act } from 'react-dom/test-utils';
+import { spyElementPrototypes } from 'rc-util/lib/test/domHook';
+import KeyCode from 'rc-util/lib/KeyCode';
+import { resetWarned } from 'rc-util/lib/warning';
+import moment from 'moment';
+import type { Moment } from 'moment';
 import type { PanelMode, PickerMode } from '../src/interface';
-import enUS from '../src/locale/en_US';
-import zhCN from '../src/locale/zh_CN';
-import {
-  clearValue,
-  closePicker,
-  confirmOK,
-  findCell,
-  getMoment,
-  isOpen,
-  isSame,
-  MomentPicker,
-  openPicker,
-  selectCell,
-} from './util/commonUtil';
-
-const fakeTime = getMoment('1990-09-03 00:00:00').valueOf();
+import { mount, getMoment, isSame, MomentPicker } from './util/commonUtil';
 
 describe('Picker.Basic', () => {
-  let errorSpy;
-  beforeEach(() => {
-    jest.useFakeTimers().setSystemTime(fakeTime);
-  });
-
   beforeAll(() => {
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => null);
+    MockDate.set(getMoment('1990-09-03 00:00:00').toDate());
   });
 
-  beforeEach(() => {
-    errorSpy.mockReset();
-    resetWarned();
-  });
   afterAll(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    MockDate.reset();
   });
-
-  function keyDown(keyCode: number) {
-    fireEvent.keyDown(document.querySelector('input'), {
-      keyCode,
-      which: keyCode,
-      charCode: keyCode,
-    });
-  }
-
-  function selectColumn(colIndex: number, rowIndex: number) {
-    fireEvent.click(document.querySelectorAll('ul')[colIndex].querySelectorAll('li')[rowIndex]);
-  }
 
   describe('mode', () => {
-    const modeList: { mode: PanelMode; className: string }[] = [
+    const modeList: { mode: PanelMode; componentNames: string[] }[] = [
       {
         mode: 'decade',
-        className: '.rc-picker-decade-panel',
+        componentNames: ['DecadePanel', 'DecadeHeader', 'DecadeBody'],
       },
       {
         mode: 'year',
-        className: '.rc-picker-year-panel',
+        componentNames: ['YearPanel', 'YearHeader', 'YearBody'],
       },
       {
         mode: 'quarter',
-        className: '.rc-picker-quarter-panel',
+        componentNames: ['QuarterPanel', 'QuarterHeader', 'QuarterBody'],
       },
       {
         mode: 'month',
-        className: '.rc-picker-month-panel',
+        componentNames: ['MonthPanel', 'MonthHeader', 'MonthBody'],
       },
       {
         mode: 'week',
-        className: '.rc-picker-week-panel',
+        componentNames: ['WeekPanel'],
       },
       {
         mode: 'date',
-        className: '.rc-picker-date-panel',
+        componentNames: ['DatePanel', 'DateHeader', 'DateBody'],
       },
       {
         mode: 'time' as any,
-        className: '.rc-picker-time-panel',
+        componentNames: ['TimePanel', 'TimeHeader', 'TimeBody'],
       },
     ];
 
-    modeList.forEach(({ mode, className }) => {
+    modeList.forEach(({ mode, componentNames }) => {
       it(mode, () => {
-        render(<MomentPicker mode={mode} open />);
-        expect(document.querySelector(className)).toBeTruthy();
+        const wrapper = mount(<MomentPicker mode={mode} open />);
+        componentNames.forEach((componentName) => {
+          expect(wrapper.find(componentName).length).toBeTruthy();
+        });
       });
     });
   });
 
   describe('picker', () => {
-    const modeList: { picker: PickerMode; className: string }[] = [
+    const modeList: { picker: PickerMode; componentNames: string[] }[] = [
       {
         picker: 'year',
-        className: '.rc-picker-year-panel',
+        componentNames: ['YearPanel', 'YearHeader', 'YearBody'],
       },
       {
         picker: 'quarter',
-        className: '.rc-picker-quarter-panel',
+        componentNames: ['QuarterPanel', 'QuarterHeader', 'QuarterBody'],
       },
       {
         picker: 'month',
-        className: '.rc-picker-month-panel',
+        componentNames: ['MonthPanel', 'MonthHeader', 'MonthBody'],
       },
       {
         picker: 'week',
-        className: '.rc-picker-week-panel',
+        componentNames: ['WeekPanel'],
       },
       {
         picker: 'date',
-        className: '.rc-picker-date-panel',
+        componentNames: ['DatePanel', 'DateHeader', 'DateBody'],
       },
       {
         picker: 'time',
-        className: '.rc-picker-time-panel',
+        componentNames: ['TimePanel', 'TimeHeader', 'TimeBody'],
       },
     ];
 
-    modeList.forEach(({ picker, className }) => {
+    modeList.forEach(({ picker, componentNames }) => {
       it(picker, () => {
-        render(<MomentPicker picker={picker as any} open />);
-        expect(document.querySelector(className)).toBeTruthy();
+        const wrapper = mount(<MomentPicker picker={picker as any} open />);
+        componentNames.forEach((componentName) => {
+          expect(wrapper.find(componentName).length).toBeTruthy();
+        });
       });
     });
   });
@@ -135,35 +101,39 @@ describe('Picker.Basic', () => {
   describe('open', () => {
     it('should work', () => {
       const onOpenChange = jest.fn();
-      const { container } = render(<MomentPicker onOpenChange={onOpenChange} />);
+      const wrapper = mount(<MomentPicker onOpenChange={onOpenChange} />);
 
-      openPicker(container);
-      expect(isOpen()).toBeTruthy();
+      wrapper.openPicker();
+      expect(wrapper.isOpen()).toBeTruthy();
       expect(onOpenChange).toHaveBeenCalledWith(true);
       onOpenChange.mockReset();
 
-      closePicker(container);
-      expect(isOpen()).toBeFalsy();
+      wrapper.closePicker();
+      expect(wrapper.isOpen()).toBeFalsy();
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });
 
     it('controlled', () => {
-      const { rerender } = render(<MomentPicker open />);
-      expect(isOpen()).toBeTruthy();
+      const wrapper = mount(<MomentPicker open />);
+      expect(wrapper.isOpen()).toBeTruthy();
 
-      rerender(<MomentPicker open={false} />);
-      expect(isOpen()).toBeFalsy();
+      wrapper.setProps({ open: false });
+      wrapper.update();
+      expect(wrapper.isOpen()).toBeFalsy();
     });
 
     it('fixed open need repeat trigger onOpenChange', () => {
       jest.useFakeTimers();
       const onOpenChange = jest.fn();
-      render(<MomentPicker onOpenChange={onOpenChange} open />);
-      expect(onOpenChange).toHaveBeenCalledTimes(0);
+      mount(<MomentPicker onOpenChange={onOpenChange} open />);
 
       for (let i = 0; i < 10; i += 1) {
+        const clickEvent = new Event('mousedown');
+        Object.defineProperty(clickEvent, 'target', {
+          get: () => document.body,
+        });
         act(() => {
-          fireEvent.mouseDown(document.body);
+          window.dispatchEvent(clickEvent);
         });
         expect(onOpenChange).toHaveBeenCalledTimes(i + 1);
       }
@@ -174,50 +144,49 @@ describe('Picker.Basic', () => {
     });
 
     it('disabled should not open', () => {
-      render(<MomentPicker open disabled />);
-      expect(isOpen()).toBeFalsy();
+      const wrapper = mount(<MomentPicker open disabled />);
+      expect(wrapper.isOpen()).toBeFalsy();
     });
   });
 
   describe('value', () => {
     it('defaultValue', () => {
-      const { container } = render(<MomentPicker defaultValue={getMoment('1989-11-28')} />);
-      expect(container.querySelector('input').value).toEqual('1989-11-28');
+      const wrapper = mount(<MomentPicker defaultValue={getMoment('1989-11-28')} />);
+      expect(wrapper.find('input').prop('value')).toEqual('1989-11-28');
     });
 
     it('uncontrolled', () => {
       const onChange = jest.fn();
-      const { container } = render(<MomentPicker onChange={onChange} />);
-      openPicker(container);
-      selectCell(11);
-      closePicker(container);
+      const wrapper = mount(<MomentPicker onChange={onChange} />);
+      wrapper.openPicker();
+      wrapper.selectCell(11);
+      wrapper.closePicker();
 
       expect(isSame(onChange.mock.calls[0][0], '1990-09-11')).toBeTruthy();
       expect(onChange.mock.calls[0][1]).toEqual('1990-09-11');
-      expect(container.querySelector('input').value).toEqual('1990-09-11');
+      expect(wrapper.find('input').prop('value')).toEqual('1990-09-11');
     });
 
     it('controlled', () => {
       const onChange = jest.fn();
-      const { container, rerender } = render(
-        <MomentPicker value={getMoment('2011-11-11')} onChange={onChange} />,
-      );
+      const wrapper = mount(<MomentPicker value={getMoment('2011-11-11')} onChange={onChange} />);
 
-      openPicker(container);
-      selectCell(3);
-      closePicker(container);
+      wrapper.openPicker();
+      wrapper.selectCell(3);
+      wrapper.closePicker();
+      wrapper.update();
 
       expect(isSame(onChange.mock.calls[0][0], '2011-11-03')).toBeTruthy();
-      expect(document.querySelector('input').value).toEqual('2011-11-11');
+      expect(wrapper.find('input').prop('value')).toEqual('2011-11-11');
 
-      rerender(<MomentPicker value={onChange.mock.calls[0][0]} onChange={onChange} />);
-
-      expect(document.querySelector('input').value).toEqual('2011-11-03');
+      wrapper.setProps({ value: onChange.mock.calls[0][0] });
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toEqual('2011-11-03');
 
       // Raw change value
-      rerender(<MomentPicker value={getMoment('1999-09-09')} onChange={onChange} />);
-
-      expect(document.querySelector('input').value).toEqual('1999-09-09');
+      wrapper.setProps({ value: getMoment('1999-09-09') });
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toEqual('1999-09-09');
     });
   });
 
@@ -239,51 +208,39 @@ describe('Picker.Basic', () => {
     ].forEach(({ name, picker, value, matchDate, selected }) => {
       it(name, () => {
         const onChange = jest.fn();
-        const { container } = render(
+        const wrapper = mount(
           <MomentPicker onChange={onChange} picker={picker as any} allowClear />,
         );
-        openPicker(container);
-        // document.querySelector('input').simulate('focus');
-        fireEvent.focus(container.querySelector('input'));
+        wrapper.openPicker();
+        wrapper.find('input').simulate('focus');
 
         // Invalidate value
-        // document.querySelector('input').simulate('change', {
-        //   target: {
-        //     value: 'abc',
-        //   },
-        // });
-        fireEvent.change(container.querySelector('input'), {
+        wrapper.find('input').simulate('change', {
           target: {
             value: 'abc',
           },
         });
 
         // Validate value
-        // document.querySelector('input').simulate('change', {
-        //   target: {
-        //     value,
-        //   },
-        // });
-        fireEvent.change(container.querySelector('input'), {
+        wrapper.find('input').simulate('change', {
           target: {
             value,
           },
         });
 
-        expect(document.querySelector('input').value).toEqual(value);
+        expect(wrapper.find('input').prop('value')).toEqual(value);
         expect(onChange).not.toHaveBeenCalled();
-        keyDown(KeyCode.ENTER);
-
+        wrapper.keyDown(KeyCode.ENTER);
         expect(isSame(onChange.mock.calls[0][0], matchDate, picker as any)).toBeTruthy();
-        expect(document.querySelector(selected)).toBeTruthy();
+        expect(wrapper.find(selected).length).toBeTruthy();
         onChange.mockReset();
 
-        clearValue();
+        wrapper.clearValue();
         expect(onChange).toHaveBeenCalledWith(null, '');
-        expect(isOpen()).toBeFalsy();
+        expect(wrapper.isOpen()).toBeFalsy();
 
-        openPicker(container);
-        expect(document.querySelector(selected)).toBeFalsy();
+        wrapper.openPicker();
+        expect(wrapper.find(selected).length).toBeFalsy();
       });
     });
   });
@@ -315,7 +272,7 @@ describe('Picker.Basic', () => {
 
     it('function call', () => {
       const ref = React.createRef<MomentPicker>();
-      render(
+      mount(
         <div>
           <MomentPicker ref={ref} />
         </div>,
@@ -332,53 +289,30 @@ describe('Picker.Basic', () => {
       const onFocus = jest.fn();
       const onBlur = jest.fn();
 
-      const { container } = render(
+      const wrapper = mount(
         <div>
           <MomentPicker onFocus={onFocus} onBlur={onBlur} />
         </div>,
       );
 
-      fireEvent.focus(container.querySelector('input'));
+      wrapper.find('input').simulate('focus');
       expect(onFocus).toHaveBeenCalled();
-      expect(document.querySelector('.rc-picker-focused')).toBeTruthy();
+      expect(wrapper.find('.rc-picker-focused').length).toBeTruthy();
 
-      fireEvent.blur(container.querySelector('input'));
+      wrapper.find('input').simulate('blur');
       expect(onBlur).toHaveBeenCalled();
-      expect(document.querySelector('.rc-picker-focused')).toBeFalsy();
+      expect(wrapper.find('.rc-picker-focused').length).toBeFalsy();
     });
   });
 
   it('block native mouseDown in panel to prevent focus changed', () => {
-    const { container } = render(<MomentPicker />);
-    openPicker(container);
+    const wrapper = mount(<MomentPicker />);
+    wrapper.openPicker();
 
-    const mouseDownEvent = createEvent.mouseDown(document.querySelector('td'));
-    fireEvent(document.querySelector('td'), mouseDownEvent);
+    const preventDefault = jest.fn();
+    wrapper.find('td').first().simulate('mouseDown', { preventDefault });
 
-    expect(mouseDownEvent.defaultPrevented).toBeTruthy();
-  });
-
-  it('not fire blur when clickinside and is in focus', () => {
-    const onBlur = jest.fn();
-    const { container } = render(
-      <MomentPicker onBlur={onBlur} suffixIcon={<div className="suffix-icon">X</div>} />,
-    );
-
-    const $input = container.querySelector('input');
-
-    openPicker(container);
-    $input.focus();
-    keyDown(KeyCode.ESC);
-
-    expect(document.activeElement).toBe($input);
-
-    // Click suffix should preventDefault
-    const $suffix = container.querySelector('.suffix-icon');
-    const mouseDownEvent = createEvent.mouseDown($suffix);
-    mouseDownEvent.preventDefault = jest.fn();
-    fireEvent($suffix, mouseDownEvent);
-
-    expect(mouseDownEvent.preventDefault).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
   });
 
   describe('full steps', () => {
@@ -386,20 +320,20 @@ describe('Picker.Basic', () => {
       {
         name: 'date',
         yearBtn: '.rc-picker-year-btn',
-        finalPanel: '.rc-picker-date-panel',
+        finalPanel: 'DatePanel',
         finalMode: 'date',
       },
       {
         name: 'datetime',
         yearBtn: '.rc-picker-year-btn',
-        finalPanel: '.rc-picker-datetime-panel',
+        finalPanel: 'DatetimePanel',
         finalMode: 'date',
         showTime: true,
       },
       {
         name: 'week',
         yearBtn: '.rc-picker-year-btn',
-        finalPanel: '.rc-picker-week-panel',
+        finalPanel: 'WeekPanel',
         finalMode: 'week',
         picker: 'week',
       },
@@ -407,7 +341,7 @@ describe('Picker.Basic', () => {
       it(name, () => {
         const onChange = jest.fn();
         const onPanelChange = jest.fn();
-        const { container } = render(
+        const wrapper = mount(
           <MomentPicker
             picker={picker as any}
             showTime={showTime}
@@ -416,7 +350,7 @@ describe('Picker.Basic', () => {
           />,
         );
 
-        openPicker(container);
+        wrapper.openPicker();
 
         function expectPanelChange(dateStr: string, mode: PanelMode) {
           expect(isSame(onPanelChange.mock.calls[0][0], dateStr)).toBeTruthy();
@@ -426,64 +360,68 @@ describe('Picker.Basic', () => {
 
         // Year
         onPanelChange.mockReset();
-        fireEvent.click(document.querySelector(yearBtn));
+        wrapper.find(yearBtn).simulate('click');
         expectPanelChange('1990-09-03', 'year');
 
         // Decade
         onPanelChange.mockReset();
-        fireEvent.click(document.querySelector('.rc-picker-decade-btn'));
+        wrapper.find('.rc-picker-decade-btn').simulate('click');
         expectPanelChange('1990-09-03', 'decade');
 
         // Next page
-        fireEvent.click(document.querySelector('.rc-picker-header-super-next-btn'));
+        wrapper.find('.rc-picker-header-super-next-btn').simulate('click');
         expectPanelChange('2090-09-03', 'decade');
 
         // Select decade
-        selectCell('2010-2019');
+        wrapper.selectCell('2010-2019');
         expectPanelChange('2010-09-03', 'year');
 
         // Select year
-        selectCell('2019');
+        wrapper.selectCell('2019');
         expectPanelChange('2019-09-03', 'month');
 
         // Select month
-        selectCell('Aug');
+        wrapper.selectCell('Aug');
         expectPanelChange('2019-08-03', finalMode as any);
 
         // Select date
-        selectCell('18');
+        wrapper.selectCell('18');
         expect(onPanelChange).not.toHaveBeenCalled();
 
-        expect(document.querySelector(finalPanel)).toBeTruthy();
+        expect(wrapper.find(finalPanel).length).toBeTruthy();
 
         if (showTime) {
-          confirmOK();
+          wrapper.confirmOK();
         }
-        closePicker(container);
+        wrapper.closePicker();
         expect(isSame(onChange.mock.calls[0][0], '2019-08-18')).toBeTruthy();
       });
     });
 
     it('date -> year -> date', () => {
-      const { container } = render(<MomentPicker />);
-      openPicker(container);
-      fireEvent.click(document.querySelector('.rc-picker-year-btn'));
-      selectCell(1990);
-      expect(document.querySelector('.rc-picker-date-panel')).toBeTruthy();
+      const wrapper = mount(<MomentPicker />);
+      wrapper.openPicker();
+      wrapper.find('.rc-picker-year-btn').simulate('click');
+      wrapper.selectCell(1990);
+      expect(wrapper.find('DatePanel')).toHaveLength(1);
     });
 
     it('time', () => {
       const onChange = jest.fn();
       const onOk = jest.fn();
-      const { container } = render(<MomentPicker picker="time" onChange={onChange} onOk={onOk} />);
-      openPicker(container);
+      const wrapper = mount(<MomentPicker picker="time" onChange={onChange} onOk={onOk} />);
+      wrapper.openPicker();
+
+      function selectColumn(colIndex: number, rowIndex: number) {
+        wrapper.find('ul').at(colIndex).find('li').at(rowIndex).simulate('click');
+      }
 
       selectColumn(0, 13);
       selectColumn(1, 22);
       selectColumn(2, 33);
 
       expect(onOk).not.toHaveBeenCalled();
-      confirmOK();
+      wrapper.confirmOK();
       expect(onOk).toHaveBeenCalled();
       expect(isSame(onChange.mock.calls[0][0], '1990-09-03 13:22:33', 'second')).toBeTruthy();
     });
@@ -491,64 +429,63 @@ describe('Picker.Basic', () => {
 
   it('renderExtraFooter', () => {
     const renderExtraFooter = jest.fn((mode) => <div>{mode}</div>);
-    const { container } = render(<MomentPicker renderExtraFooter={renderExtraFooter} />);
+    const wrapper = mount(<MomentPicker renderExtraFooter={renderExtraFooter} />);
 
     function matchFooter(mode: string) {
-      expect(document.querySelector('.rc-picker-footer').textContent).toEqual(mode);
+      expect(wrapper.find('.rc-picker-footer').text()).toEqual(mode);
       expect(renderExtraFooter.mock.calls[renderExtraFooter.mock.calls.length - 1][0]).toEqual(
         mode,
       );
     }
 
     // Date
-    openPicker(container);
+    wrapper.openPicker();
     matchFooter('date');
 
     // Month
-    fireEvent.click(document.querySelector('.rc-picker-month-btn'));
-
+    wrapper.find('.rc-picker-month-btn').simulate('click');
+    wrapper.update();
     matchFooter('month');
 
     // Year
-    fireEvent.click(document.querySelector('.rc-picker-year-btn'));
-
+    wrapper.find('.rc-picker-year-btn').simulate('click');
+    wrapper.update();
     matchFooter('year');
   });
 
   describe('showToday', () => {
     it('only works on date', () => {
       const onSelect = jest.fn();
-      const { container } = render(<MomentPicker onSelect={onSelect} showToday />);
-      openPicker(container);
-      fireEvent.click(document.querySelector('.rc-picker-today-btn'));
+      const wrapper = mount(<MomentPicker onSelect={onSelect} showToday />);
+      wrapper.openPicker();
+      wrapper.find('.rc-picker-today-btn').simulate('click');
       expect(isSame(onSelect.mock.calls[0][0], '1990-09-03')).toBeTruthy();
     });
 
     it('disabled when in disabledDate', () => {
       const onSelect = jest.fn();
-      const { container } = render(
+      const wrapper = mount(
         <MomentPicker onSelect={onSelect} disabledDate={() => true} showToday />,
       );
-      openPicker(container);
-      expect(document.querySelector('.rc-picker-today-btn')).toHaveClass(
-        'rc-picker-today-btn-disabled',
-      );
-      fireEvent.click(document.querySelector('.rc-picker-today-btn'));
+      wrapper.openPicker();
+      expect(
+        wrapper.find('.rc-picker-today-btn').hasClass('rc-picker-today-btn-disabled'),
+      ).toBeTruthy();
+      wrapper.find('.rc-picker-today-btn').simulate('click');
       expect(onSelect).not.toHaveBeenCalled();
     });
 
     ['decade', 'year', 'quarter', 'month', 'week'].forEach((name) => {
       it(`not works on ${name}`, () => {
-        const { container } = render(<MomentPicker picker={name as any} showToday />);
-        openPicker(container);
-        expect(document.querySelector('.rc-picker-today-btn')).toBeFalsy();
+        const wrapper = mount(<MomentPicker picker={name as any} showToday />);
+        wrapper.openPicker();
+        expect(wrapper.find('.rc-picker-today-btn').length).toBeFalsy();
       });
     });
   });
 
   it('icon', () => {
-    expect(errorSpy).not.toHaveBeenCalled();
-    render(
+    const wrapper = mount(
       <MomentPicker
         defaultValue={getMoment('1990-09-03')}
         suffixIcon={<span className="suffix-icon" />}
@@ -556,226 +493,146 @@ describe('Picker.Basic', () => {
         allowClear
       />,
     );
-    expect(document.querySelector('.rc-picker-input')).toMatchSnapshot();
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Warning: `clearIcon` will be removed in future. Please use `allowClear` instead.',
-    );
-  });
 
-  it('inputRender', () => {
-    render(<MomentPicker inputRender={(props) => <input {...props} />} />);
-
-    expect(document.querySelector('.rc-picker-input')).toMatchSnapshot();
+    expect(wrapper.find('.rc-picker-input').render()).toMatchSnapshot();
   });
 
   describe('showNow', () => {
     it('datetime should display now', () => {
       const onSelect = jest.fn();
-      const { container } = render(<MomentPicker onSelect={onSelect} showTime />);
-      openPicker(container);
-      fireEvent.click(document.querySelector('.rc-picker-now > a'));
+      const wrapper = mount(<MomentPicker onSelect={onSelect} showTime />);
+      wrapper.openPicker();
+      wrapper.find('.rc-picker-now > a').simulate('click');
 
       expect(isSame(onSelect.mock.calls[0][0], '1990-09-03 00:00:00', 'second')).toBeTruthy();
     });
 
     it("date shouldn't display now", () => {
       const onSelect = jest.fn();
-      const { container } = render(<MomentPicker onSelect={onSelect} />);
-      openPicker(container);
-      expect(document.querySelector('.rc-picker-now > a')).toBeFalsy();
+      const wrapper = mount(<MomentPicker onSelect={onSelect} />);
+      wrapper.openPicker();
+      expect(wrapper.find('.rc-picker-now > a').length).toEqual(0);
     });
 
     it("datetime shouldn't display now when showNow is false", () => {
       const onSelect = jest.fn();
-      const { container } = render(<MomentPicker onSelect={onSelect} showTime showNow={false} />);
-      openPicker(container);
-      expect(document.querySelector('.rc-picker-now > a')).toBeFalsy();
+      const wrapper = mount(<MomentPicker onSelect={onSelect} showTime showNow={false} />);
+      wrapper.openPicker();
+      expect(wrapper.find('.rc-picker-now > a').length).toEqual(0);
     });
 
     it('time should display now', () => {
       const onSelect = jest.fn();
-      const { container } = render(<MomentPicker onSelect={onSelect} picker="time" />);
-      openPicker(container);
-      fireEvent.click(document.querySelector('.rc-picker-now > a'));
+      const wrapper = mount(<MomentPicker onSelect={onSelect} picker="time" />);
+      wrapper.openPicker();
+      wrapper.find('.rc-picker-now > a').simulate('click');
 
       expect(isSame(onSelect.mock.calls[0][0], '1990-09-03 00:00:00', 'second')).toBeTruthy();
     });
 
     it("time shouldn't display now when showNow is false", () => {
       const onSelect = jest.fn();
-      const { container } = render(
-        <MomentPicker onSelect={onSelect} picker="time" showNow={false} />,
-      );
-      openPicker(container);
-      expect(document.querySelector('.rc-picker-now > a')).toBeFalsy();
+      const wrapper = mount(<MomentPicker onSelect={onSelect} picker="time" showNow={false} />);
+      wrapper.openPicker();
+      expect(wrapper.find('.rc-picker-now > a').length).toEqual(0);
     });
   });
 
   describe('time step', () => {
     it('work with now', () => {
-      jest.setSystemTime(getMoment('1990-09-03 00:09:00').valueOf());
+      MockDate.set(getMoment('1990-09-03 00:09:00').toDate());
       const onSelect = jest.fn();
-      const { container } = render(
-        <MomentPicker onSelect={onSelect} picker="time" minuteStep={10} />,
-      );
-      openPicker(container);
-      // document.querySelector('.rc-picker-now > a').simulate('click');
-      fireEvent.click(document.querySelector('.rc-picker-now > a'));
+      const wrapper = mount(<MomentPicker onSelect={onSelect} picker="time" minuteStep={10} />);
+      wrapper.openPicker();
+      wrapper.find('.rc-picker-now > a').simulate('click');
       expect(isSame(onSelect.mock.calls[0][0], '1990-09-03 00:00:59', 'second')).toBeTruthy();
-      jest.setSystemTime(getMoment('1990-09-03 00:00:00').valueOf());
+      MockDate.set(getMoment('1990-09-03 00:00:00').toDate());
     });
-
     it('should show warning when hour step is invalid', () => {
-      expect(errorSpy).not.toBeCalled();
-      const { container } = render(<MomentPicker picker="time" hourStep={9} />);
-      openPicker(container);
-      expect(errorSpy).toBeCalledWith(
-        'Warning: `hourStep` 9 is invalid. It should be a factor of 24.',
-      );
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      expect(spy).not.toBeCalled();
+      const wrapper = mount(<MomentPicker picker="time" hourStep={9} />);
+      wrapper.openPicker();
+      expect(spy).toBeCalledWith('Warning: `hourStep` 9 is invalid. It should be a factor of 24.');
+      spy.mockRestore();
     });
-
-    it('should change 12 hours format correctly', () => {
-      const onTimeChange = jest.fn();
-      const { getByText } = render(
-        <MomentPicker
-          disabledTime={() => ({
-            disabledHours: () => [0],
-            disabledMinutes: (hour) => {
-              onTimeChange(hour);
-              return [0];
-            },
-            disabledSeconds: () => [0],
-          })}
-          value={getMoment('2000-01-01 21:40:40')}
-          format="YYYY-MM-DD hh:mm:ss A"
-          use12Hours
-          showTime
-          open
-        />,
-      );
-
-      fireEvent.click(getByText('PM'));
-
-      expect(onTimeChange).not.toBeCalledWith(9);
-      expect(onTimeChange).toBeCalledWith(21);
-    });
-
     it('should show warning when minute step is invalid', () => {
-      expect(errorSpy).not.toBeCalled();
-      const { container } = render(<MomentPicker picker="time" minuteStep={9} />);
-      openPicker(container);
-      expect(errorSpy).toBeCalledWith(
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      expect(spy).not.toBeCalled();
+      const wrapper = mount(<MomentPicker picker="time" minuteStep={9} />);
+      wrapper.openPicker();
+      expect(spy).toBeCalledWith(
         'Warning: `minuteStep` 9 is invalid. It should be a factor of 60.',
       );
+      spy.mockRestore();
     });
-
     it('should show warning when second step is invalid', () => {
-      expect(errorSpy).not.toBeCalled();
-      const { container } = render(<MomentPicker picker="time" secondStep={9} />);
-      openPicker(container);
-      expect(errorSpy).toBeCalledWith(
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      expect(spy).not.toBeCalled();
+      const wrapper = mount(<MomentPicker picker="time" secondStep={9} />);
+      wrapper.openPicker();
+      expect(spy).toBeCalledWith(
         'Warning: `secondStep` 9 is invalid. It should be a factor of 60.',
       );
-    });
-
-    // https://github.com/ant-design/ant-design/issues/40914
-    ['hour', 'minute', 'second'].forEach((unit, index) => {
-      it(`should show integer when step is not integer (${unit})`, () => {
-        const props = {
-          [`${unit}Step`]: 5.5,
-        };
-        const { container } = render(<MomentPicker picker="time" {...props} />);
-        openPicker(container);
-
-        const column = document.querySelector(
-          `.rc-picker-time-panel-column:nth-child(${index + 1})`,
-        );
-        expect(column).toBeTruthy();
-
-        const cells = column.querySelectorAll('.rc-picker-time-panel-cell-inner');
-        cells.forEach((cell) => {
-          expect(Number.isInteger(Number(cell.textContent))).toBeTruthy();
-        });
-      });
-    });
-
-    it('should work when hourStep < 0', () => {
-      // @ts-ignore
-      const { container } = render(<MomentPicker picker="time" hourStep={-1} />);
-      openPicker(container);
-      expect(document.querySelectorAll('.rc-picker-time-panel-column')[0].children.length).toBe(24);
+      spy.mockRestore();
     });
   });
 
   it('pass data- & aria- & role', () => {
-    const { container } = render(<MomentPicker data-test="233" aria-label="3334" role="search" />);
+    const wrapper = mount(<MomentPicker data-test="233" aria-label="3334" role="search" />);
 
-    expect(container).toMatchSnapshot();
+    expect(wrapper.render()).toMatchSnapshot();
   });
 
   it('support name & autoComplete prop', () => {
-    const { container } = render(<MomentPicker name="bamboo" autoComplete="off" />);
+    const wrapper = mount(<MomentPicker name="bamboo" autoComplete="off" />);
 
-    expect(container.querySelector('input')).toHaveAttribute('name', 'bamboo');
-    expect(container.querySelector('input')).toHaveAttribute('autoComplete', 'off');
+    expect(wrapper.find('input').props()).toMatchObject({ name: 'bamboo', autoComplete: 'off' });
   });
 
   it('blur should reset invalidate text', () => {
-    const { container } = render(<MomentPicker />);
-    openPicker(container);
-    fireEvent.change(container.querySelector('input'), {
+    const wrapper = mount(<MomentPicker />);
+    wrapper.openPicker();
+    wrapper.find('input').simulate('change', {
       target: {
         value: 'Invalidate',
       },
     });
-    closePicker(container);
-    expect(document.querySelector('input').value).toEqual('');
+    wrapper.closePicker();
+    expect(wrapper.find('input').props().value).toEqual('');
   });
 
   it('should render correctly in rtl', () => {
-    const { container } = render(<MomentPicker direction="rtl" allowClear />);
-    expect(container).toMatchSnapshot();
+    const wrapper = mount(<MomentPicker direction="rtl" allowClear />);
+    expect(wrapper.render()).toMatchSnapshot();
   });
 
   it('week picker show correct year', () => {
-    const { container } = render(<MomentPicker value={getMoment('2019-12-31')} picker="week" />);
+    const wrapper = mount(<MomentPicker value={getMoment('2019-12-31')} picker="week" />);
 
-    expect(container.querySelector('input').value).toEqual('2020-1st');
+    expect(wrapper.find('input').prop('value')).toEqual('2020-1st');
   });
 
-  it('Picker should open when click inside', () => {
-    const onClick = jest.fn();
-    render(<MomentPicker onClick={onClick} />);
-    const inputElement = document.querySelector('input');
+  it('click outside should also focus', () => {
+    const onMouseUp = jest.fn();
+    const wrapper = mount(<MomentPicker onMouseUp={onMouseUp} />);
+    const inputElement = wrapper.find('input').instance() as any as HTMLInputElement;
     inputElement.focus = jest.fn();
 
-    fireEvent.click(document.querySelector('.rc-picker'));
+    wrapper.find('.rc-picker').simulate('mouseUp');
     expect(inputElement.focus).toHaveBeenCalled();
-    expect(isOpen()).toBeTruthy();
+    expect(wrapper.isOpen()).toBeTruthy();
 
-    expect(onClick).toHaveBeenCalled();
+    expect(onMouseUp).toHaveBeenCalled();
   });
 
   it('not open when disabled', () => {
-    const { rerender } = render(<MomentPicker disabled />);
-    // document.querySelector('.rc-picker').simulate('click');
-    fireEvent.click(document.querySelector('.rc-picker'));
-    expect(isOpen()).toBeFalsy();
+    const wrapper = mount(<MomentPicker disabled />);
+    wrapper.find('.rc-picker').simulate('mouseUp');
+    expect(wrapper.isOpen()).toBeFalsy();
 
-    // wrapper.setProps({ disabled: false });
-    rerender(<MomentPicker disabled={false} />);
-    expect(isOpen()).toBeFalsy();
-  });
-
-  it('not open when mouseup', () => {
-    render(<MomentPicker />);
-    const inputElement = document.querySelector('input');
-    inputElement.focus = jest.fn();
-
-    // document.querySelector('.rc-picker').simulate('mouseup');
-    fireEvent.mouseUp(document.querySelector('.rc-picker'));
-    expect(inputElement.focus).toHaveBeenCalledTimes(0);
-    expect(isOpen()).toBeFalsy();
+    wrapper.setProps({ disabled: false });
+    expect(wrapper.isOpen()).toBeFalsy();
   });
 
   it('defaultOpenValue in timePicker', () => {
@@ -783,7 +640,7 @@ describe('Picker.Basic', () => {
     const onChange = jest.fn();
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { container } = render(
+    const wrapper = mount(
       <MomentPicker
         picker="time"
         defaultOpenValue={getMoment('2000-01-01 00:10:23')}
@@ -795,9 +652,8 @@ describe('Picker.Basic', () => {
       'Warning: `defaultOpenValue` may confuse user for the current value status. Please use `defaultValue` instead.',
     );
 
-    openPicker(container);
-    // document.querySelector('.rc-picker-ok button').simulate('click');
-    fireEvent.click(document.querySelector('.rc-picker-ok button'));
+    wrapper.openPicker();
+    wrapper.find('.rc-picker-ok button').simulate('click');
 
     expect(isSame(onChange.mock.calls[0][0], '2000-01-01 00:10:23')).toBeTruthy();
 
@@ -805,25 +661,25 @@ describe('Picker.Basic', () => {
   });
 
   it('close to reset', () => {
-    const { container } = render(<MomentPicker defaultValue={getMoment('2000-01-01')} />);
+    const wrapper = mount(<MomentPicker defaultValue={getMoment('2000-01-01')} />);
 
-    openPicker(container);
-    fireEvent.change(document.querySelector('input'), {
+    wrapper.openPicker();
+    wrapper.find('input').simulate('change', {
       target: {
         value: 'aaaaa',
       },
     });
-    expect(document.querySelector('input').value).toEqual('aaaaa');
+    expect(wrapper.find('input').props().value).toEqual('aaaaa');
 
-    closePicker(container);
-    expect(document.querySelector('input').value).toEqual('2000-01-01');
+    wrapper.closePicker();
+    expect(wrapper.find('input').props().value).toEqual('2000-01-01');
   });
 
   it('switch picker should change format', () => {
-    const { rerender } = render(
+    const wrapper = mount(
       <MomentPicker picker="date" showTime defaultValue={getMoment('1999-09-03')} />,
     );
-    expect(document.querySelector('input').value).toEqual('1999-09-03 00:00:00');
+    expect(wrapper.find('input').props().value).toEqual('1999-09-03 00:00:00');
 
     [
       ['date', '1999-09-03'],
@@ -831,160 +687,128 @@ describe('Picker.Basic', () => {
       ['quarter', '1999-Q3'],
       ['year', '1999'],
     ].forEach(([picker, text]) => {
-      rerender(
-        <MomentPicker
-          picker={picker as any}
-          showTime={false}
-          defaultValue={getMoment('1999-09-03')}
-        />,
-      );
-
-      expect(document.querySelector('input').value).toEqual(text);
+      wrapper.setProps({ picker, showTime: false });
+      wrapper.update();
+      expect(wrapper.find('input').props().value).toEqual(text);
     });
   });
 
   it('id', () => {
-    const { container } = render(<MomentPicker id="light" />);
-    expect(container.querySelector('input').id).toEqual('light');
+    const wrapper = mount(<MomentPicker id="light" />);
+    expect(wrapper.find('input').props().id).toEqual('light');
   });
 
   it('dateRender', () => {
-    render(<MomentPicker open dateRender={(date) => date.format('YYYY-MM-DD')} />);
-    const tdList = document.querySelectorAll('tbody td');
-    expect(tdList[tdList.length - 1].textContent).toEqual('1990-10-06');
+    const wrapper = mount(<MomentPicker open dateRender={(date) => date.format('YYYY-MM-DD')} />);
+    expect(wrapper.find('tbody td').last().text()).toEqual('1990-10-06');
   });
 
   it('format', () => {
-    const { container } = render(<MomentPicker format={['YYYYMMDD', 'YYYY-MM-DD']} />);
-    openPicker(container);
-    fireEvent.change(container.querySelector('input'), {
+    const wrapper = mount(<MomentPicker format={['YYYYMMDD', 'YYYY-MM-DD']} />);
+    wrapper.openPicker();
+    wrapper.find('input').simulate('change', {
       target: {
         value: '2000-01-01',
       },
     });
-    closePicker(container);
-    expect(document.querySelector('input').value).toEqual('20000101');
+    wrapper.closePicker();
+    expect(wrapper.find('input').prop('value')).toEqual('20000101');
   });
 
   it('custom format', () => {
-    const { container } = render(
+    const wrapper = mount(
       <MomentPicker
         allowClear
         defaultValue={getMoment('2020-09-17')}
         format={[(val: Moment) => `custom format:${val.format('YYYYMMDD')}`, 'YYYY-MM-DD']}
       />,
     );
-    expect(document.querySelector('input')).toHaveAttribute('readOnly');
-    openPicker(container);
-    selectCell(24);
-    closePicker(container);
-    expect(document.querySelector('input').value).toEqual('custom format:20200924');
+    expect(wrapper.find('input').prop('readOnly')).toBeTruthy();
+    wrapper.openPicker();
+    wrapper.selectCell(24);
+    wrapper.closePicker();
+    expect(wrapper.find('input').prop('value')).toEqual('custom format:20200924');
 
     // clear
-    clearValue();
-    expect(document.querySelector('input').value).toEqual('');
-  });
-
-  it('custom clear icon', () => {
-    render(
-      <MomentPicker
-        allowClear={{ clearIcon: <span className="custom-clear">clear</span> }}
-        defaultValue={getMoment('2020-09-17')}
-      />,
-    );
-
-    // clear
-    expect(document.querySelector('.custom-clear')).toBeTruthy();
-    clearValue();
-    expect(document.querySelector('input').value).toEqual('');
+    const clearNode = wrapper.find('.rc-picker-clear');
+    expect(clearNode.simulate.bind(clearNode, 'mouseUp')).not.toThrow();
+    expect(wrapper.find('input').prop('value')).toEqual('');
   });
 
   it('panelRender', () => {
-    render(<MomentPicker open panelRender={() => <h1>Light</h1>} />);
-    expect(document.querySelector('.rc-picker')).toMatchSnapshot();
+    const wrapper = mount(<MomentPicker open panelRender={() => <h1>Light</h1>} />);
+    expect(wrapper.render()).toMatchSnapshot();
   });
 
   it('change panel when `picker` changed', () => {
-    const { rerender } = render(<MomentPicker open picker="week" />);
-    expect(document.querySelector('.rc-picker-week-panel')).toBeTruthy();
-    rerender(<MomentPicker open picker="month" />);
-
-    expect(document.querySelector('.rc-picker-week-panel')).toBeFalsy();
-    expect(document.querySelector('.rc-picker-month-panel')).toBeTruthy();
+    const wrapper = mount(<MomentPicker open picker="week" />);
+    expect(wrapper.find('.rc-picker-week-panel').length).toEqual(1);
+    wrapper.setProps({ picker: 'month' });
+    wrapper.update();
+    expect(wrapper.find('.rc-picker-week-panel').length).toEqual(0);
+    expect(wrapper.find('.rc-picker-month-panel').length).toEqual(1);
   });
 
   describe('hover value', () => {
     beforeEach(() => {
       jest.useFakeTimers();
     });
-
     afterEach(() => {
       jest.useRealTimers();
     });
-
     it('should restore when leave', () => {
-      render(<MomentPicker open defaultValue={getMoment('2020-07-22')} />);
-      const cell = findCell(24);
-      fireEvent.mouseEnter(cell);
+      const wrapper = mount(<MomentPicker open defaultValue={getMoment('2020-07-22')} />);
+      const cell = wrapper.findCell(24);
+      cell.simulate('mouseEnter');
       jest.runAllTimers();
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-24');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeTruthy();
 
-      expect(document.querySelector('input').value).toBe('2020-07-24');
-      expect(document.querySelector('.rc-picker-input')).toHaveClass('rc-picker-input-placeholder');
-
-      fireEvent.mouseLeave(cell);
+      cell.simulate('mouseLeave');
       jest.runAllTimers();
-
-      expect(document.querySelector('input').value).toBe('2020-07-22');
-      expect(document.querySelector('.rc-picker-input')).not.toHaveClass(
-        'rc-picker-input-placeholder',
-      );
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-22');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeFalsy();
     });
 
     it('should restore after selecting cell', () => {
-      const { container } = render(<MomentPicker defaultValue={getMoment('2020-07-22')} />);
-      openPicker(container);
-      const cell = findCell(24);
-      // cell.simulate('mouseEnter');
-      fireEvent.mouseEnter(cell);
+      const wrapper = mount(<MomentPicker defaultValue={getMoment('2020-07-22')} />);
+      wrapper.openPicker();
+      const cell = wrapper.findCell(24);
+      cell.simulate('mouseEnter');
       jest.runAllTimers();
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-24');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeTruthy();
 
-      expect(document.querySelector('input').value).toBe('2020-07-24');
-      expect(document.querySelector('.rc-picker-input')).toHaveClass('rc-picker-input-placeholder');
-
-      selectCell(24);
-      expect(document.querySelector('input').value).toBe('2020-07-24');
-      expect(document.querySelector('.rc-picker-input')).not.toHaveClass(
-        'rc-picker-input-placeholder',
-      );
+      wrapper.selectCell(24);
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-24');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeFalsy();
     });
 
     it('change value when hovering', () => {
-      const { container } = render(<MomentPicker defaultValue={getMoment('2020-07-22')} />);
-      openPicker(container);
-      const cell = findCell(24);
-      // cell.simulate('mouseEnter');
-      fireEvent.mouseEnter(cell);
+      const wrapper = mount(<MomentPicker defaultValue={getMoment('2020-07-22')} />);
+      wrapper.openPicker();
+      const cell = wrapper.findCell(24);
+      cell.simulate('mouseEnter');
       jest.runAllTimers();
+      wrapper.update();
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-24');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeTruthy();
 
-      expect(document.querySelector('input').value).toBe('2020-07-24');
-      expect(document.querySelector('.rc-picker-input')).toHaveClass('rc-picker-input-placeholder');
-
-      fireEvent.change(container.querySelector('input'), {
+      wrapper.find('input').simulate('change', {
         target: {
           value: '2020-07-23',
         },
       });
 
-      expect(document.querySelector('input').value).toBe('2020-07-23');
-      expect(document.querySelector('.rc-picker-input')).not.toHaveClass(
-        'rc-picker-input-placeholder',
-      );
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-23');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeFalsy();
 
-      closePicker(container);
-      expect(document.querySelector('input').value).toBe('2020-07-23');
-      expect(document.querySelector('.rc-picker-input')).not.toHaveClass(
-        'rc-picker-input-placeholder',
-      );
+      wrapper.closePicker();
+      expect(wrapper.find('input').prop('value')).toBe('2020-07-23');
+      expect(wrapper.find('.rc-picker-input').hasClass('rc-picker-input-placeholder')).toBeFalsy();
     });
   });
 
@@ -1019,7 +843,7 @@ describe('Picker.Basic', () => {
 
     it('work', () => {
       jest.useFakeTimers();
-      const { unmount } = render(
+      const wrapper = mount(
         <MomentPicker picker="time" defaultValue={getMoment('2020-07-22 09:03:28')} open />,
       );
       jest.runAllTimers();
@@ -1027,122 +851,119 @@ describe('Picker.Basic', () => {
       expect(triggered).toBeTruthy();
 
       jest.useRealTimers();
-      unmount();
+      wrapper.unmount();
     });
   });
 
   describe('prevent default on keydown', () => {
     it('should open picker panel if no prevent default', () => {
-      const { container } = render(<MomentPicker />);
+      const keyDown = jest.fn();
+      const wrapper = mount(<MomentPicker onKeyDown={keyDown} />);
 
-      closePicker(container);
-      keyDown(KeyCode.ENTER);
-      expect(isOpen()).toBeTruthy();
+      wrapper.closePicker();
+      wrapper.keyDown(KeyCode.ENTER);
+      expect(wrapper.isOpen()).toBeTruthy();
     });
 
     it('should not open if prevent default is called', () => {
-      const onKeyDown = jest.fn(({ which }, preventDefault) => {
+      const keyDown = jest.fn(({ which }, preventDefault) => {
         if (which === 13) preventDefault();
       });
-      const { container } = render(<MomentPicker onKeyDown={onKeyDown} />);
+      const wrapper = mount(<MomentPicker onKeyDown={keyDown} />);
 
-      openPicker(container);
-      expect(isOpen()).toBeTruthy();
+      wrapper.openPicker();
+      expect(wrapper.isOpen()).toBeTruthy();
 
-      keyDown(KeyCode.ESC);
-      expect(isOpen()).toBeFalsy();
+      wrapper.keyDown(KeyCode.ESC);
+      expect(wrapper.isOpen()).toBeFalsy();
 
-      keyDown(KeyCode.ENTER);
-      expect(isOpen()).toBeFalsy();
+      wrapper.keyDown(KeyCode.ENTER);
+      expect(wrapper.isOpen()).toBeFalsy();
+    });
+  });
+
+  describe('disabledDate', () => {
+    function disabledDate(current: Moment) {
+      return current <= getMoment('2020-12-28 00:00:00').endOf('day');
+    }
+    const wrapper = mount(
+      <MomentPicker
+        open
+        defaultValue={getMoment('2020-12-29 12:00:00')}
+        disabledDate={disabledDate}
+      />,
+    );
+    // Date Panel
+    Array.from({
+      length: 31,
+    }).forEach((v, i) => {
+      const cell = wrapper.findCell(`${i + 1}`);
+      // >= 29
+      if (i >= 28) {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeFalsy();
+      } else {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeTruthy();
+      }
+    });
+    wrapper.find('.rc-picker-month-btn').simulate('click');
+    // Month Panel
+    Array.from({
+      length: 12,
+    }).forEach((v, i) => {
+      const cell = wrapper.find('.rc-picker-cell-in-view').at(i);
+      // >= 12
+      if (i >= 11) {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeFalsy();
+      } else {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeTruthy();
+      }
+    });
+    wrapper.find('.rc-picker-year-btn').simulate('click');
+    // Year Panel
+    Array.from({
+      length: 10,
+    }).forEach((v, i) => {
+      const cell = wrapper.find('.rc-picker-cell-in-view').at(i);
+      // >= 2020
+      expect(cell.hasClass('rc-picker-cell-disabled')).toBeFalsy();
+    });
+    // Decade Panel
+    Array.from({
+      length: 8,
+    }).forEach((v, i) => {
+      const cell = wrapper.find('.rc-picker-cell-in-view').at(i);
+      // >= 2020
+      expect(cell.hasClass('rc-picker-cell-disabled')).toBeFalsy();
+    });
+
+    const quarterWrapper = mount(
+      <MomentPicker
+        picker="quarter"
+        open
+        defaultValue={getMoment('2020-12-29 12:00:00')}
+        disabledDate={disabledDate}
+      />,
+    );
+    // quarter Panel
+    Array.from({
+      length: 4,
+    }).forEach((v, i) => {
+      const cell = quarterWrapper.find('.rc-picker-cell-in-view').at(i);
+      // >= 4
+      if (i >= 3) {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeFalsy();
+      } else {
+        expect(cell.hasClass('rc-picker-cell-disabled')).toBeTruthy();
+      }
     });
   });
 
   it('disabledDate should not crash', () => {
-    const { container } = render(<MomentPicker open disabledDate={(d) => d.isAfter(Date.now())} />);
-    fireEvent.change(container.querySelector('input'), {
-      target: { value: moment().add(1, 'year').format('YYYY-MM-DD') },
-    });
+    const wrapper = mount(<MomentPicker open disabledDate={(d) => d.isAfter(Date.now())} />);
+    wrapper
+      .find('input')
+      .simulate('change', { target: { value: moment().add(1, 'year').format('YYYY-MM-DD') } });
 
-    keyDown(KeyCode.ENTER);
-  });
-
-  it('presets', () => {
-    const onChange = jest.fn();
-
-    render(
-      <MomentPicker
-        onChange={onChange}
-        open
-        presets={[{ label: 'Bamboo', value: moment('2000-09-03') }]}
-      />,
-    );
-
-    expect(document.querySelector('.rc-picker-presets li').textContent).toBe('Bamboo');
-    // document.querySelector('.rc-picker-presets li').simulate('click');
-    fireEvent.click(document.querySelector('.rc-picker-presets li'));
-
-    expect(onChange.mock.calls[0][0].format('YYYY-MM-DD')).toEqual('2000-09-03');
-  });
-
-  it('presets support callback', () => {
-    const onChange = jest.fn();
-    const mockPresetValue = jest.fn().mockImplementationOnce(() => moment('2000-09-03'));
-
-    render(
-      <MomentPicker
-        onChange={onChange}
-        open
-        presets={[
-          {
-            label: 'Bamboo',
-            value: mockPresetValue,
-          },
-        ]}
-      />,
-    );
-
-    const firstPreset = document.querySelector('.rc-picker-presets li');
-    expect(firstPreset.textContent).toBe('Bamboo');
-
-    fireEvent.click(firstPreset);
-
-    expect(mockPresetValue).toHaveBeenCalled();
-    expect(onChange.mock.calls[0][0].format('YYYY-MM-DD')).toEqual('2000-09-03');
-
-    mockPresetValue.mockImplementationOnce(() => moment('2023-05-01 12:34:56'));
-
-    fireEvent.click(firstPreset);
-
-    expect(mockPresetValue).toBeCalledTimes(2);
-    expect(onChange).toBeCalledTimes(2);
-
-    expect(onChange.mock.calls[1][0].format('YYYY-MM-DD HH:mm:ss')).toEqual('2023-05-01 12:34:56');
-  });
-
-  it('switch picker locale should reformat value', () => {
-    const { container, rerender } = render(
-      <MomentPicker value={getMoment('2011-11-11')} format={'dddd'} locale={enUS} />,
-    );
-    expect(container.querySelector('input').value).toEqual('Friday');
-
-    // Switch locale
-    moment.locale('zh-cn');
-    rerender(<MomentPicker value={getMoment('2011-11-11')} format={'dddd'} locale={zhCN} />);
-    expect(container.querySelector('input').value).toEqual('星期五');
-
-    // Reset locale
-    moment.locale('en');
-  });
-
-  it('select minutes and seconds directly in dateTime mode will apply the current time', () => {
-    jest.setSystemTime(getMoment('2023-09-04 21:49:10').valueOf());
-    const ui = <MomentPicker showTime />;
-    const { container } = render(ui);
-
-    openPicker(container);
-    // Select minute
-    selectColumn(1, 5);
-
-    expect(container.querySelector('input')).toHaveValue('2023-09-04 21:05:10');
+    wrapper.find('input').simulate('keyDown', { which: KeyCode.ENTER });
   });
 });

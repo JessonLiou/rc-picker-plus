@@ -1,5 +1,9 @@
-import { defineConfig } from 'father';
-
-export default defineConfig({
-  plugins: ['@rc-component/father-plugin'],
-});
+export default {
+  cjs: 'babel',
+  esm: { type: 'babel', importLibToEs: true },
+  preCommit: {
+    eslint: true,
+    prettier: true,
+  },
+  runtimeHelpers: true,
+};

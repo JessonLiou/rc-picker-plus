@@ -1,9 +1,9 @@
 import * as React from 'react';
 import type { GenerateConfig } from '../../generate';
-import useCellClassName from '../../hooks/useCellClassName';
-import type { CellRender, Locale } from '../../interface';
-import RangeContext from '../../RangeContext';
+import type { Locale } from '../../interface';
 import { formatValue, isSameMonth } from '../../utils/dateUtil';
+import RangeContext from '../../RangeContext';
+import useCellClassName from '../../hooks/useCellClassName';
 import PanelBody from '../PanelBody';
 
 export const MONTH_COL_COUNT = 3;
@@ -18,12 +18,12 @@ export type MonthBodyProps<DateType> = {
   value?: DateType | null;
   viewDate: DateType;
   disabledDate?: (date: DateType) => boolean;
-  cellRender?: CellRender<DateType>;
+  monthCellRender?: MonthCellRender<DateType>;
   onSelect: (value: DateType) => void;
 };
 
 function MonthBody<DateType>(props: MonthBodyProps<DateType>) {
-  const { prefixCls, locale, value, viewDate, generateConfig, cellRender } = props;
+  const { prefixCls, locale, value, viewDate, generateConfig, monthCellRender } = props;
 
   const { rangedValue, hoverRangedValue } = React.useContext(RangeContext);
 
@@ -48,14 +48,8 @@ function MonthBody<DateType>(props: MonthBodyProps<DateType>) {
 
   const baseMonth = generateConfig.setMonth(viewDate, 0);
 
-  const getCellNode = cellRender
-    ? (date: DateType, wrapperNode: React.ReactElement) =>
-        cellRender(date, {
-          originNode: wrapperNode,
-          locale,
-          today: generateConfig.getNow(),
-          type: 'month',
-        })
+  const getCellNode = monthCellRender
+    ? (date: DateType) => monthCellRender(date, locale)
     : undefined;
 
   return (
@@ -65,7 +59,7 @@ function MonthBody<DateType>(props: MonthBodyProps<DateType>) {
       colNum={MONTH_COL_COUNT}
       baseDate={baseMonth}
       getCellNode={getCellNode}
-      getCellText={(date) =>
+      getCellText={date =>
         locale.monthFormat
           ? formatValue(date, {
               locale,
@@ -76,7 +70,7 @@ function MonthBody<DateType>(props: MonthBodyProps<DateType>) {
       }
       getCellClassName={getCellClassName}
       getCellDate={generateConfig.addMonth}
-      titleCell={(date) =>
+      titleCell={date =>
         formatValue(date, {
           locale,
           format: 'YYYY-MM',

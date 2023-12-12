@@ -1,7 +1,6 @@
-import KeyCode from 'rc-util/lib/KeyCode';
-import raf from 'rc-util/lib/raf';
 import type * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import KeyCode from 'rc-util/lib/KeyCode';
 import { addGlobalMouseDownEvent, getTargetFromEvent } from '../utils/uiUtil';
 
 export default function usePickerInput({
@@ -12,7 +11,6 @@ export default function usePickerInput({
   forwardKeyDown,
   onKeyDown,
   blurToCancel,
-  changeOnBlur,
   onSubmit,
   onCancel,
   onFocus,
@@ -25,7 +23,6 @@ export default function usePickerInput({
   forwardKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => boolean;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, preventDefault: () => void) => void;
   blurToCancel?: boolean;
-  changeOnBlur?: boolean
   onSubmit: () => void | boolean;
   onCancel: () => void;
   onFocus?: React.FocusEventHandler<HTMLInputElement>;
@@ -133,7 +130,9 @@ export default function usePickerInput({
       }
       setFocused(false);
 
-      onBlur?.(e);
+      if (onBlur) {
+        onBlur(e);
+      }
     },
   };
 
@@ -150,17 +149,18 @@ export default function usePickerInput({
   useEffect(() =>
     addGlobalMouseDownEvent((e: MouseEvent) => {
       const target = getTargetFromEvent(e);
-      const clickedOutside = isClickOutside(target);
 
       if (open) {
+        const clickedOutside = isClickOutside(target);
+
         if (!clickedOutside) {
           preventBlurRef.current = true;
 
           // Always set back in case `onBlur` prevented by user
-          raf(() => {
+          requestAnimationFrame(() => {
             preventBlurRef.current = false;
           });
-        } else if (!changeOnBlur && !blurToCancel && (!focused || clickedOutside)) {
+        } else if (!focused || clickedOutside) {
           triggerOpen(false);
         }
       }

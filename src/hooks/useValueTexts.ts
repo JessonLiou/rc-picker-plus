@@ -1,9 +1,8 @@
+import shallowEqual from 'shallowequal';
 import useMemo from 'rc-util/lib/hooks/useMemo';
-import shallowEqual from 'rc-util/lib/isEqual';
-import * as React from 'react';
 import type { GenerateConfig } from '../generate';
 import type { CustomFormat, Locale } from '../interface';
-import { formatValue, isEqual } from '../utils/dateUtil';
+import { formatValue } from '../utils/dateUtil';
 
 export type ValueTextConfig<DateType> = {
   formatList: (string | CustomFormat<DateType>)[];
@@ -14,8 +13,8 @@ export type ValueTextConfig<DateType> = {
 export default function useValueTexts<DateType>(
   value: DateType | null,
   { formatList, generateConfig, locale }: ValueTextConfig<DateType>,
-): [valueTexts: string[], firstValueText: string] {
-  const [texts, text] = useMemo<[string[], string]>(
+) {
+  return useMemo<[string[], string]>(
     () => {
       if (!value) {
         return [[''], ''];
@@ -37,15 +36,7 @@ export default function useValueTexts<DateType>(
 
       return [fullValueTexts, firstValueText];
     },
-    [value, formatList, locale],
-    (prev, next) =>
-      // Not Same Date
-      !isEqual(generateConfig, prev[0], next[0]) ||
-      // Not Same format
-      !shallowEqual(prev[1], next[1], true) ||
-      // Not Same locale
-      !shallowEqual(prev[2], next[2], true),
+    [value, formatList],
+    (prev, next) => prev[0] !== next[0] || !shallowEqual(prev[1], next[1]),
   );
-
-  return React.useMemo(() => [texts, text], [texts.join(''), text]);
 }

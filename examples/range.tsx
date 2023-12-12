@@ -1,10 +1,9 @@
-import type { Moment } from 'moment';
-import moment from 'moment';
 import React from 'react';
-import '../../assets/index.less';
-import momentGenerateConfig from '../../src/generate/moment';
-import zhCN from '../../src/locale/zh_CN';
-import RangePicker from '../../src/RangePicker';
+import moment, { Moment } from 'moment';
+import RangePicker from '../src/RangePicker';
+import momentGenerateConfig from '../src/generate/moment';
+import zhCN from '../src/locale/zh_CN';
+import '../assets/index.less';
 import './common.less';
 
 const defaultStartValue = moment('2019-09-03 05:02:03');
@@ -41,11 +40,6 @@ export default () => {
 
   const rangePickerRef = React.useRef<RangePicker<Moment>>(null);
 
-  const now = momentGenerateConfig.getNow();
-  const disabledDate = (current: Moment) => {
-    return current.diff(now, 'days') > 1 || current.diff(now, 'days') < -1;
-  };
-
   return (
     <div>
       <h2>Value: {value ? `${formatDate(value[0])} ~ ${formatDate(value[1])}` : 'null'}</h2>
@@ -62,16 +56,6 @@ export default () => {
             defaultValue={[moment('1990-09-03'), moment('1989-11-28')]}
             clearIcon={<span>X</span>}
             suffixIcon={<span>O</span>}
-            presets={[
-              {
-                label: 'Last week',
-                value: [moment().subtract(1, 'week'), moment()],
-              },
-              {
-                label: 'Last 3 days',
-                value: () => [moment().subtract(3, 'days'), moment().add(3, 'days')],
-              },
-            ]}
           />
           <RangePicker<Moment>
             {...sharedProps}
@@ -79,19 +63,13 @@ export default () => {
             allowClear
             ref={rangePickerRef}
             showTime
-            style={{ width: 580 }}
-            cellRender={(current, info) => (
-              <div title={info.type} style={{ background: 'green' }}>
-                {typeof current === 'number' ? current : current.get('date')}
-              </div>
-            )}
+            style={{ width: 700 }}
             ranges={{
               ranges: [moment(), moment().add(10, 'day')],
             }}
-            onOk={(dates) => {
+            onOk={dates => {
               console.log('OK!!!', dates);
             }}
-            changeOnBlur
           />
           <RangePicker<Moment>
             {...sharedProps}
@@ -102,14 +80,6 @@ export default () => {
             ranges={{
               test: [moment(), moment().add(1, 'hour')],
             }}
-          />
-          <RangePicker<Moment>
-            {...sharedProps}
-            value={undefined}
-            locale={zhCN}
-            allowClear
-            picker="time"
-            style={{ width: 280 }}
           />
         </div>
 
@@ -190,16 +160,6 @@ export default () => {
             value={undefined}
             locale={zhCN}
             placeholder={['start...', 'end...']}
-          />
-        </div>
-        <div style={{ margin: '0 8px' }}>
-          <h3>DisabledDate</h3>
-          <RangePicker<Moment>
-            {...sharedProps}
-            value={undefined}
-            locale={zhCN}
-            placeholder={['start...', 'end...']}
-            disabledDate={disabledDate}
           />
         </div>
       </div>

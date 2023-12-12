@@ -5,47 +5,45 @@
  *  Panel change will not trigger `onSelect` but trigger `onPanelChange`
  */
 
+import * as React from 'react';
 import classNames from 'classnames';
-import useMergedState from 'rc-util/lib/hooks/useMergedState';
 import KeyCode from 'rc-util/lib/KeyCode';
 import warning from 'rc-util/lib/warning';
-import * as React from 'react';
+import useMergedState from 'rc-util/lib/hooks/useMergedState';
+import type { SharedTimeProps } from './panels/TimePanel';
+import TimePanel from './panels/TimePanel';
+import DatetimePanel from './panels/DatetimePanel';
+import DatePanel from './panels/DatePanel';
+import WeekPanel from './panels/WeekPanel';
+import MonthPanel from './panels/MonthPanel';
+import QuarterPanel from './panels/QuarterPanel';
+import YearPanel from './panels/YearPanel';
+import DecadePanel from './panels/DecadePanel';
 import type { GenerateConfig } from './generate';
-import { useCellRender } from './hooks/useCellRender';
 import type {
-  CellRender,
-  Components,
-  DisabledTime,
   Locale,
-  OnPanelChange,
   PanelMode,
   PanelRefProps,
   PickerMode,
+  DisabledTime,
+  OnPanelChange,
+  Components,
 } from './interface';
+import { isEqual } from './utils/dateUtil';
 import PanelContext from './PanelContext';
-import DatePanel from './panels/DatePanel';
 import type { DateRender } from './panels/DatePanel/DateBody';
-import DatetimePanel from './panels/DatetimePanel';
-import DecadePanel from './panels/DecadePanel';
-import MonthPanel from './panels/MonthPanel';
-import { MONTH_COL_COUNT, type MonthCellRender } from './panels/MonthPanel/MonthBody';
-import QuarterPanel from './panels/QuarterPanel';
-import type { SharedTimeProps } from './panels/TimePanel';
-import TimePanel from './panels/TimePanel';
-import WeekPanel from './panels/WeekPanel';
-import YearPanel from './panels/YearPanel';
+import { PickerModeMap } from './utils/uiUtil';
+import type { MonthCellRender } from './panels/MonthPanel/MonthBody';
 import RangeContext from './RangeContext';
-import { isEqual, WEEK_DAY_COUNT } from './utils/dateUtil';
 import getExtraFooter from './utils/getExtraFooter';
 import getRanges from './utils/getRanges';
 import { getLowerBoundTime, setDateTime, setTime } from './utils/timeUtil';
-import { PickerModeMap } from './utils/uiUtil';
 
 export type PickerPanelSharedProps<DateType> = {
   prefixCls?: string;
   className?: string;
   style?: React.CSSProperties;
-  /** @deprecated Will be removed in next big version. Please use `picker` instead */
+  /** @deprecated Will be removed in next big version. Please use `mode` instead */
   mode?: PanelMode;
   tabIndex?: number;
 
@@ -58,19 +56,14 @@ export type PickerPanelSharedProps<DateType> = {
   defaultValue?: DateType;
   /** [Legacy] Set default display picker view date */
   pickerValue?: DateType;
-  /**
-   * @deprecated please use `defaultValue` instead.
-   * Set default display picker view date
-   */
+  /** [Legacy] Set default display picker view date */
   defaultPickerValue?: DateType;
 
   // Date
   disabledDate?: (date: DateType) => boolean;
 
   // Render
-  /** @deprecated use cellRender instead of dateRender */
   dateRender?: DateRender<DateType>;
-  /** @deprecated use cellRender instead of monthCellRender */
   monthCellRender?: MonthCellRender<DateType>;
   renderExtraFooter?: (mode: PanelMode) => React.ReactNode;
 
@@ -90,12 +83,10 @@ export type PickerPanelSharedProps<DateType> = {
 
   /** @private Internal usage. Do not use in your production env */
   components?: Components;
-  cellRender?: CellRender<DateType>;
 };
 
 export type PickerPanelBaseProps<DateType> = {
   picker: Exclude<PickerMode, 'date' | 'time'>;
-  cellRender?: CellRender<DateType>;
 } & PickerPanelSharedProps<DateType>;
 
 export type PickerPanelDateProps<DateType> = {
@@ -106,12 +97,10 @@ export type PickerPanelDateProps<DateType> = {
   // Time
   showTime?: boolean | SharedTimeProps<DateType>;
   disabledTime?: DisabledTime<DateType>;
-  cellRender?: CellRender<DateType>;
 } & PickerPanelSharedProps<DateType>;
 
 export type PickerPanelTimeProps<DateType> = {
   picker: 'time';
-  cellRender?: CellRender<DateType, number>;
 } & PickerPanelSharedProps<DateType> &
   SharedTimeProps<DateType>;
 
@@ -127,9 +116,6 @@ type OmitType<DateType> = Omit<PickerPanelBaseProps<DateType>, 'picker'> &
 type MergedPickerPanelProps<DateType> = {
   picker?: PickerMode;
 } & OmitType<DateType>;
-
-// Calendar picker type
-const CALENDAR_PANEL_MODE: PanelMode[] = ['date', 'month'];
 
 function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
   const {
@@ -162,9 +148,6 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
     hourStep = 1,
     minuteStep = 1,
     secondStep = 1,
-    dateRender,
-    monthCellRender,
-    cellRender,
   } = props as MergedPickerPanelProps<DateType>;
 
   const needConfirmButton: boolean = (picker === 'date' && !!showTime) || picker === 'time';
@@ -173,7 +156,6 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
   const isMinuteStepValid = 60 % minuteStep === 0;
   const isSecondStepValid = 60 % secondStep === 0;
 
-  // ============================ Warning ============================
   if (process.env.NODE_ENV !== 'production') {
     warning(!value || generateConfig.isValidate(value), 'Invalidate date pass to `value`.');
     warning(!value || generateConfig.isValidate(value), 'Invalidate date pass to `defaultValue`.');
@@ -186,15 +168,18 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
       isSecondStepValid,
       `\`secondStep\` ${secondStep} is invalid. It should be a factor of 60.`,
     );
-    warning(!defaultPickerValue, `'defaultPickerValue' is deprecated. Please use 'defaultValue' instead.`);
-    warning(!dateRender, `'dateRender' is deprecated. Please use 'cellRender' instead.`);
-    warning(!monthCellRender, `'monthCellRender' is deprecated. Please use 'cellRender' instead.`);
   }
 
   // ============================ State =============================
 
   const panelContext = React.useContext(PanelContext);
-  const { operationRef, onSelect: onContextSelect, hideRanges, defaultOpenValue } = panelContext;
+  const {
+    operationRef,
+    panelRef: panelDivRef,
+    onSelect: onContextSelect,
+    hideRanges,
+    defaultOpenValue,
+  } = panelContext;
 
   const { inRange, panelPosition, rangedValue, hoverRangedValue } = React.useContext(RangeContext);
   const panelRef = React.useRef<PanelRefProps>({});
@@ -220,20 +205,22 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
     defaultValue: defaultPickerValue || mergedValue,
     postState: (date) => {
       const now = generateConfig.getNow();
-      if (!date) {
-        return now;
-      }
+      if (!date) return now;
       // When value is null and set showTime
       if (!mergedValue && showTime) {
-        const defaultDateObject =
-          typeof showTime === 'object' ? showTime.defaultValue : defaultValue;
-        return setDateTime(
-          generateConfig,
-          Array.isArray(date) ? date[0] : date,
-          defaultDateObject || now,
-        );
+        if (typeof showTime === 'object') {
+          return setDateTime(
+            generateConfig,
+            Array.isArray(date) ? date[0] : date,
+            showTime.defaultValue || now,
+          );
+        }
+        if (defaultValue) {
+          return setDateTime(generateConfig, Array.isArray(date) ? date[0] : date, defaultValue);
+        }
+        return setDateTime(generateConfig, Array.isArray(date) ? date[0] : date, now);
       }
-      return Array.isArray(date) ? date[0] : date;
+      return date;
     },
   });
 
@@ -305,49 +292,9 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
     }
   };
 
-  const isSelectable = (key) => {
-    if (CALENDAR_PANEL_MODE.includes(mergedMode)) {
-      let date;
-      let operationFnc;
-      const isDateMode = mergedMode === 'date';
-      if (key === KeyCode.PAGE_UP || key === KeyCode.PAGE_DOWN) {
-        operationFnc = isDateMode ? generateConfig.addMonth : generateConfig.addYear;
-      } else {
-        operationFnc = isDateMode ? generateConfig.addDate : generateConfig.addMonth;
-      }
-
-      switch (key) {
-        case KeyCode.LEFT:
-        case KeyCode.PAGE_UP:
-          date = operationFnc(viewDate, -1);
-          break;
-        case KeyCode.RIGHT:
-        case KeyCode.PAGE_DOWN:
-          date = operationFnc(viewDate, 1);
-          break;
-        case KeyCode.UP:
-        case KeyCode.DOWN:
-          date = operationFnc(
-            viewDate,
-            Number(
-              `${key === KeyCode.UP ? '-' : ''}${isDateMode ? WEEK_DAY_COUNT : MONTH_COL_COUNT}`,
-            ),
-          );
-          break;
-      }
-
-      if (date) {
-        return !disabledDate?.(date);
-      }
-    }
-    return true;
-  };
-
   // ========================= Interactive ==========================
   const onInternalKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (panelRef.current && panelRef.current.onKeyDown) {
-      let selectable = true;
-      const { which } = e;
       if (
         [
           KeyCode.LEFT,
@@ -357,18 +304,11 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
           KeyCode.PAGE_UP,
           KeyCode.PAGE_DOWN,
           KeyCode.ENTER,
-        ].includes(which)
+        ].includes(e.which)
       ) {
         e.preventDefault();
-        if (which !== KeyCode.ENTER && tabIndex === 0) {
-          selectable = isSelectable(which);
-        }
       }
-
-      // Cannot use keyboard to select disabled date
-      if (selectable) {
-        return panelRef.current.onKeyDown(e);
-      }
+      return panelRef.current.onKeyDown(e);
     }
 
     /* istanbul ignore next */
@@ -414,14 +354,8 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
   // ============================ Panels ============================
   let panelNode: React.ReactNode;
 
-  const mergedCellRender = useCellRender<DateType>({
-    cellRender,
-    monthCellRender,
-    dateRender,
-  });
   const pickerProps = {
     ...(props as MergedPickerPanelProps<DateType>),
-    cellRender: mergedCellRender,
     operationRef: panelRef,
     prefixCls,
     viewDate,
@@ -485,7 +419,7 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
 
     case 'week':
       panelNode = (
-        <WeekPanel<DateType>
+        <WeekPanel
           {...pickerProps}
           onSelect={(date, type) => {
             setViewDate(date);
@@ -512,7 +446,7 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
     default:
       if (showTime) {
         panelNode = (
-          <DatetimePanel<DateType>
+          <DatetimePanel
             {...pickerProps}
             onSelect={(date, type) => {
               setViewDate(date);
@@ -559,32 +493,27 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
 
   if (!hideRanges) {
     extraFooter = getExtraFooter(prefixCls, mergedMode, renderExtraFooter);
-
-    // This content is not displayed when the header switches year and month
-    if (showTime && mergedMode !== 'date') {
-      rangesNode = null;
-    } else {
-      rangesNode = getRanges({
-        prefixCls,
-        components,
-        needConfirmButton,
-        okDisabled: !mergedValue || (disabledDate && disabledDate(mergedValue)),
-        locale,
-        showNow,
-        onNow: needConfirmButton && onNow,
-        onOk: () => {
-          if (mergedValue) {
-            triggerSelect(mergedValue, 'submit', true);
-            if (onOk) {
-              onOk(mergedValue);
-            }
+    rangesNode = getRanges({
+      prefixCls,
+      components,
+      needConfirmButton,
+      okDisabled: !mergedValue || (disabledDate && disabledDate(mergedValue)),
+      locale,
+      showNow,
+      onNow: needConfirmButton && onNow,
+      onOk: () => {
+        if (mergedValue) {
+          triggerSelect(mergedValue, 'submit', true);
+          if (onOk) {
+            onOk(mergedValue);
           }
-        },
-      });
-    }
+        }
+      },
+    });
   }
 
   let todayNode: React.ReactNode;
+
   if (showToday && mergedMode === 'date' && picker === 'date' && !showTime) {
     const now = generateConfig.getNow();
     const todayCls = `${prefixCls}-today-btn`;
@@ -626,6 +555,7 @@ function PickerPanel<DateType>(props: PickerPanelProps<DateType>) {
         onKeyDown={onInternalKeyDown}
         onBlur={onInternalBlur}
         onMouseDown={onMouseDown}
+        ref={panelDivRef}
       >
         {panelNode}
         {extraFooter || rangesNode || todayNode ? (

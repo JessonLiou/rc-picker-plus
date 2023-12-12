@@ -2,7 +2,6 @@ import MockDate from 'mockdate';
 import momentGenerateConfig from '../src/generate/moment';
 import dayjsGenerateConfig from '../src/generate/dayjs';
 import dateFnsGenerateConfig from '../src/generate/dateFns';
-import luxonGenerateConfig from '../src/generate/luxon';
 import { getMoment } from './util/commonUtil';
 
 import 'dayjs/locale/zh-cn';
@@ -21,7 +20,6 @@ describe('Picker.Generate', () => {
     { name: 'moment', generateConfig: momentGenerateConfig },
     { name: 'dayjs', generateConfig: dayjsGenerateConfig },
     { name: 'date-fns', generateConfig: dateFnsGenerateConfig },
-    { name: 'luxon', generateConfig: luxonGenerateConfig },
   ];
 
   list.forEach(({ name, generateConfig }) => {
@@ -92,7 +90,7 @@ describe('Picker.Generate', () => {
           });
 
           it('week', () => {
-            if (!['date-fns', 'luxon'].includes(name)) {
+            if (name !== 'date-fns') {
               expect(
                 generateConfig.locale.format(
                   'en_US',
@@ -118,22 +116,10 @@ describe('Picker.Generate', () => {
             }
           });
         });
-
-        describe('format', () => {
-          it('escape strings', () => {
-            if (name !== 'date-fns') {
-              expect(
-                generateConfig.locale.format('en_US', generateConfig.getNow(), 'YYYY-[Q]Q'),
-              ).toEqual('1990-Q3');
-            }
-          });
-        });
       });
 
       it('getWeekFirstDay', () => {
-        const expectedUsFirstDay = name === 'luxon' ? 1 : 0;
-
-        expect(generateConfig.locale.getWeekFirstDay('en_US')).toEqual(expectedUsFirstDay);
+        expect(generateConfig.locale.getWeekFirstDay('en_US')).toEqual(0);
         expect(generateConfig.locale.getWeekFirstDay('zh_CN')).toEqual(1);
 
         // Should keep same weekday
@@ -156,17 +142,12 @@ describe('Picker.Generate', () => {
           'zh_CN',
           generateConfig.locale.parse('zh_CN', '2020-12-30', [formatStr]),
         );
-
-        const expectedUsFirstDate = name === 'luxon' ? '28' : '27';
-
-        expect(generateConfig.locale.format('en_US', usDate, formatStr)).toEqual(
-          `2020-12-${expectedUsFirstDate}`,
-        );
+        expect(generateConfig.locale.format('en_US', usDate, formatStr)).toEqual('2020-12-27');
         expect(generateConfig.locale.format('zh_CN', cnDate, formatStr)).toEqual('2020-12-28');
       });
 
       it('Parse format Wo', () => {
-        if (!['date-fns', 'luxon'].includes(name)) {
+        if (name !== 'date-fns') {
           expect(
             generateConfig.locale.parse('en_US', '2012-51st', ['YYYY-Wo']).format('Wo'),
           ).toEqual('51st');
@@ -245,14 +226,12 @@ describe('Picker.Generate', () => {
             generateConfig.locale.parse('zh_CN', '2019-12-08', [formatStr]),
           ),
         ).toEqual(49);
-
-        const expectedUsWeek = name === 'luxon' ? 49 : 50;
         expect(
           generateConfig.locale.getWeek(
             'en_US',
             generateConfig.locale.parse('en_US', '2019-12-08', [formatStr]),
           ),
-        ).toEqual(expectedUsWeek);
+        ).toEqual(50);
       });
     });
   });
@@ -267,22 +246,4 @@ describe('Generate:moment', () => {
     momentGenerateConfig.getWeekDay(now);
     expect(now.locale()).toEqual('zh-cn');
   });
-});
-
-describe('Generate:dayjs', () => {
-  it('getFixedDate', () => {
-    const timea = dayjsGenerateConfig.getFixedDate('2019-2-08');
-    const timeb = dayjsGenerateConfig.getFixedDate('2019-02-08');
-    expect(timea.isValid()).toBeTruthy();
-    expect(timea.valueOf()).toEqual(timeb.valueOf());
-  });
-
-  it('parse', () => {
-    const timea = dayjsGenerateConfig.locale.parse('en_US', '2022-11-23 13:5' ,['YYYY-MM-DD HH:mm']);
-    expect(timea).toEqual(null);
-
-    const timeb = dayjsGenerateConfig.locale.parse('en_US', '2022-11-23 13:05' ,['YYYY-MM-DD HH:mm']);
-    const dateb = dayjsGenerateConfig.locale.format('en_US', timeb, 'YYYY-MM-DD HH:mm');
-    expect(dateb).toEqual('2022-11-23 13:05');
-  })
 });

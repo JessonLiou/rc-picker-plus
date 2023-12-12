@@ -1,10 +1,10 @@
-import classNames from 'classnames';
 import * as React from 'react';
-import type { GenerateConfig } from '../generate';
-import type { PanelMode } from '../interface';
+import classNames from 'classnames';
 import PanelContext from '../PanelContext';
-import { getCellDateDisabled } from '../utils/dateUtil';
+import type { GenerateConfig } from '../generate';
 import { getLastDay } from '../utils/timeUtil';
+import type { PanelMode } from '../interface';
+import { getCellDateDisabled } from '../utils/dateUtil';
 
 export type PanelBodyProps<DateType> = {
   prefixCls: string;
@@ -20,7 +20,7 @@ export type PanelBodyProps<DateType> = {
   getCellClassName: (date: DateType) => Record<string, boolean | undefined>;
   getCellDate: (date: DateType, offset: number) => DateType;
   getCellText: (date: DateType) => React.ReactNode;
-  getCellNode?: (date: DateType, wrapperNode: React.ReactElement) => React.ReactNode;
+  getCellNode?: (date: DateType) => React.ReactNode;
   titleCell?: (date: DateType) => string;
   generateConfig: GenerateConfig<DateType>;
 
@@ -77,7 +77,7 @@ export default function PanelBody<DateType>({
       }
 
       const title = titleCell && titleCell(currentDate);
-      const inner = <div className={`${cellPrefixCls}-inner`}>{getCellText(currentDate)}</div>;
+
       row.push(
         <td
           key={j}
@@ -107,7 +107,11 @@ export default function PanelBody<DateType>({
             }
           }}
         >
-          {getCellNode ? getCellNode(currentDate, inner) : inner}
+          {getCellNode ? (
+            getCellNode(currentDate)
+          ) : (
+            <div className={`${cellPrefixCls}-inner`}>{getCellText(currentDate)}</div>
+          )}
         </td>,
       );
     }

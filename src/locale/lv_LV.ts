@@ -5,7 +5,7 @@ const locale: Locale = {
   today: 'Šodien',
   now: 'Tagad',
   backToToday: 'Atpakaļ pie šodienas',
-  ok: 'OK',
+  ok: 'Ok',
   clear: 'Skaidrs',
   month: 'Mēnesis',
   year: 'Gads',

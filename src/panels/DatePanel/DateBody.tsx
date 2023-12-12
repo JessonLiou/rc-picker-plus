@@ -1,27 +1,26 @@
 import * as React from 'react';
 import type { GenerateConfig } from '../../generate';
-import useCellClassName from '../../hooks/useCellClassName';
-import type { CellRender, Locale } from '../../interface';
-import RangeContext from '../../RangeContext';
 import {
-  formatValue,
+  WEEK_DAY_COUNT,
   getWeekStartDate,
   isSameDate,
   isSameMonth,
-  WEEK_DAY_COUNT,
+  formatValue,
 } from '../../utils/dateUtil';
+import type { Locale } from '../../interface';
+import RangeContext from '../../RangeContext';
+import useCellClassName from '../../hooks/useCellClassName';
 import PanelBody from '../PanelBody';
 
 export type DateRender<DateType> = (currentDate: DateType, today: DateType) => React.ReactNode;
 
 export type DateBodyPassProps<DateType> = {
-  cellRender?: CellRender<DateType>;
+  dateRender?: DateRender<DateType>;
   disabledDate?: (date: DateType) => boolean;
 
   // Used for week panel
   prefixColumn?: (date: DateType) => React.ReactNode;
   rowClassName?: (date: DateType) => string;
-  isSameCell?: (current: DateType, target: DateType) => boolean;
 };
 
 export type DateBodyProps<DateType> = {
@@ -43,8 +42,7 @@ function DateBody<DateType>(props: DateBodyProps<DateType>) {
     rowCount,
     viewDate,
     value,
-    cellRender,
-    isSameCell,
+    dateRender,
   } = props;
 
   const { rangedValue, hoverRangedValue } = React.useContext(RangeContext);
@@ -77,20 +75,12 @@ function DateBody<DateType>(props: DateBodyProps<DateType>) {
     generateConfig,
     rangedValue: prefixColumn ? null : rangedValue,
     hoverRangedValue: prefixColumn ? null : hoverRangedValue,
-    isSameCell: isSameCell || ((current, target) => isSameDate(generateConfig, current, target)),
-    isInView: (date) => isSameMonth(generateConfig, date, viewDate),
+    isSameCell: (current, target) => isSameDate(generateConfig, current, target),
+    isInView: date => isSameMonth(generateConfig, date, viewDate),
     offsetCell: (date, offset) => generateConfig.addDate(date, offset),
   });
 
-  const getCellNode = cellRender
-    ? (date: DateType, wrapperNode: React.ReactElement) =>
-        cellRender(date, {
-          originNode: wrapperNode,
-          today,
-          type: 'date',
-          locale
-        })
-    : undefined;
+  const getCellNode = dateRender ? (date: DateType) => dateRender(date, today) : undefined;
 
   return (
     <PanelBody
@@ -102,7 +92,7 @@ function DateBody<DateType>(props: DateBodyProps<DateType>) {
       getCellText={generateConfig.getDate}
       getCellClassName={getCellClassName}
       getCellDate={generateConfig.addDate}
-      titleCell={(date) =>
+      titleCell={date =>
         formatValue(date, {
           locale,
           format: 'YYYY-MM-DD',

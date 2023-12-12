@@ -5,7 +5,7 @@ const locale: Locale = {
   today: 'Bugün',
   now: 'Şimdi',
   backToToday: 'Bugüne Geri Dön',
-  ok: 'Tamam',
+  ok: 'tamam',
   clear: 'Temizle',
   month: 'Ay',
   year: 'Yıl',

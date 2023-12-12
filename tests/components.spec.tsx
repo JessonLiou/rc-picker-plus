@@ -1,7 +1,12 @@
-import { render } from '@testing-library/react';
-import MockDate from 'mockdate';
 import React from 'react';
-import { getMoment, MomentPicker, MomentPickerPanel, MomentRangePicker } from './util/commonUtil';
+import MockDate from 'mockdate';
+import {
+  mount,
+  getMoment,
+  MomentRangePicker,
+  MomentPicker,
+  MomentPickerPanel,
+} from './util/commonUtil';
 
 describe('Picker.Components', () => {
   beforeAll(() => {
@@ -13,16 +18,16 @@ describe('Picker.Components', () => {
   });
 
   [
-    { name: 'RangePicker', component: MomentRangePicker },
+    { name: 'RangePicker', component: MomentRangePicker, ranges: true },
     { name: 'Picker', component: MomentPicker },
     { name: 'PickerPanel', component: MomentPickerPanel },
-  ].forEach(({ name, component }) => {
+  ].forEach(({ name, component, ranges }) => {
     it(name, () => {
       const Component = component as any;
-      const Button: React.FC<any> = (props) => <h1 {...props} />;
-      const Item: React.FC<any> = (props) => <h2 {...props} />;
+      const Button: React.FC<any> = props => <h1 {...props} />;
+      const Item: React.FC<any> = props => <h2 {...props} />;
 
-      render(
+      const wrapper = mount(
         <Component
           ranges={{
             good: [null, null],
@@ -36,7 +41,10 @@ describe('Picker.Components', () => {
         />,
       );
 
-      expect(document.querySelector('.rc-picker-footer').querySelectorAll('h1')).toHaveLength(1);
+      expect(wrapper.find('.rc-picker-footer').find('h1')).toHaveLength(1);
+      if (ranges) {
+        expect(wrapper.find('.rc-picker-footer').find('h2')).toHaveLength(1);
+      }
     });
   });
 });

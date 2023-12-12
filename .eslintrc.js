@@ -1,6 +1,9 @@
+const base = require('@umijs/fabric/dist/eslint');
+
 module.exports = {
-  extends: [require.resolve('@umijs/fabric/dist/eslint')],
+  ...base,
   rules: {
+    ...base.rules,
     'arrow-parens': 0,
     'no-template-curly-in-string': 0,
     'prefer-promise-reject-errors': 0,
